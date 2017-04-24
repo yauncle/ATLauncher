@@ -39,10 +39,10 @@ public class ATLauncherAPIUtils {
         request.put("ram", Utils.getSystemRam());
         request.put("64_bit", Utils.is64Bit());
 
-        try {
+        /*try {
             Utils.sendAPICall("system-info", request);
         } catch (IOException e) {
             App.settings.logStackTrace("Error sending in details of system", e);
-        }
+        }*/
     }
 }
