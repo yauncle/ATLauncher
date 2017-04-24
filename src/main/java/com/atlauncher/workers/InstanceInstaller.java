@@ -17,6 +17,25 @@
  */
 package com.atlauncher.workers;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.FilenameFilter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.jar.JarEntry;
+import java.util.jar.JarInputStream;
+import java.util.jar.JarOutputStream;
+
+import javax.swing.SwingWorker;
+
 import com.atlauncher.App;
 import com.atlauncher.Gsons;
 import com.atlauncher.LogManager;
@@ -45,29 +64,12 @@ import com.atlauncher.data.mojang.MojangConstants;
 import com.atlauncher.data.mojang.MojangDownloads;
 import com.atlauncher.gui.dialogs.ModsChooser;
 import com.atlauncher.utils.Utils;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonIOException;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonSyntaxException;
-
-import javax.swing.SwingWorker;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FilenameFilter;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.jar.JarEntry;
-import java.util.jar.JarInputStream;
-import java.util.jar.JarOutputStream;
 
 public class InstanceInstaller extends SwingWorker<Boolean, Void> {
 
@@ -98,6 +100,7 @@ public class InstanceInstaller extends SwingWorker<Boolean, Void> {
     private int percent = 0; // Percent done installing
     private List<Mod> allMods;
     private List<Mod> selectedMods;
+    private List<Mod> unselectedMods = new ArrayList<Mod>();
     private int totalDownloads = 0; // Total number of downloads to download
     private int doneDownloads = 0; // Total number of downloads downloaded
     private int totalBytes = 0; // Total number of bytes to download
@@ -291,6 +294,10 @@ public class InstanceInstaller extends SwingWorker<Boolean, Void> {
 
     public boolean wasModInstalled(String mod) {
         return instance != null && instance.wasModInstalled(mod);
+    }
+
+    public boolean wasModSelected(String mod) {
+        return instance != null && instance.wasModSelected(mod);
     }
 
     public boolean isReinstall() {
@@ -758,11 +765,11 @@ public class InstanceInstaller extends SwingWorker<Boolean, Void> {
                 }
             }
         } catch (JsonSyntaxException e) {
-            App.settings.logStackTrace(e);
+            LogManager.logStackTrace(e);
         } catch (JsonIOException e) {
-            App.settings.logStackTrace(e);
+            LogManager.logStackTrace(e);
         } catch (FileNotFoundException e) {
-            App.settings.logStackTrace(e);
+            LogManager.logStackTrace(e);
         }
 
         return downloads;
@@ -902,7 +909,7 @@ public class InstanceInstaller extends SwingWorker<Boolean, Void> {
             inputFile.delete();
             outputTmpFile.renameTo(inputFile);
         } catch (IOException e) {
-            App.settings.logStackTrace(e);
+            LogManager.logStackTrace(e);
         }
     }
 
@@ -915,6 +922,12 @@ public class InstanceInstaller extends SwingWorker<Boolean, Void> {
         this.totalBytes = configsDownload.getFilesize();
         this.downloadedBytes = 0;
         configsDownload.download(true); // Download the file
+
+        if (!configs.exists()) {
+            LogManager.warn("Failed to download configs for pack!");
+            this.cancel(true);
+            return;
+        }
 
         // Extract the configs zip file
         fireSubProgressUnknown();
@@ -1123,16 +1136,18 @@ public class InstanceInstaller extends SwingWorker<Boolean, Void> {
             return false;
         }
         if (this.jsonVersion.hasMessages()) {
-            if (this.isReinstall && this.jsonVersion.getMessages().hasUpdateMessage() && this.jsonVersion.getMessages
-                    ().showUpdateMessage(this.pack) != 0) {
-                LogManager.error("Instance Install Cancelled After Viewing Message!");
-                cancel(true);
-                return false;
-            } else if (this.jsonVersion.getMessages().hasInstallMessage() && this.jsonVersion.getMessages()
-                    .showInstallMessage(this.pack) != 0) {
-                LogManager.error("Instance Install Cancelled After Viewing Message!");
-                cancel(true);
-                return false;
+            if (this.isReinstall && this.jsonVersion.getMessages().hasUpdateMessage()) {
+                if (this.jsonVersion.getMessages().showUpdateMessage(this.pack) != 0) {
+                    LogManager.error("Instance Install Cancelled After Viewing Message!");
+                    cancel(true);
+                    return false;
+                }
+            } else if (this.jsonVersion.getMessages().hasInstallMessage()) {
+                if (this.jsonVersion.getMessages().showInstallMessage(this.pack) != 0) {
+                    LogManager.error("Instance Install Cancelled After Viewing Message!");
+                    cancel(true);
+                    return false;
+                }
             }
         }
 
@@ -1165,6 +1180,7 @@ public class InstanceInstaller extends SwingWorker<Boolean, Void> {
                 return false;
             }
             this.selectedMods = modsChooser.getSelectedMods();
+            this.unselectedMods = modsChooser.getUnselectedMods();
         }
         if (!hasOptional) {
             this.selectedMods = this.allMods;
@@ -1276,6 +1292,9 @@ public class InstanceInstaller extends SwingWorker<Boolean, Void> {
         if (!this.jsonVersion.hasNoConfigs()) {
             configurePack();
         }
+        if (isCancelled()) {
+            return false;
+        }
         // Copy over common configs if any
         if (App.settings.getCommonConfigsDir().listFiles().length != 0) {
             Utils.copyDirectory(App.settings.getCommonConfigsDir(), getRootDirectory());
@@ -1292,6 +1311,20 @@ public class InstanceInstaller extends SwingWorker<Boolean, Void> {
             shFile.setExecutable(true);
         }
 
+        // add in the deselected mods to the instance.json
+        for (Mod mod : this.unselectedMods) {
+            String file = mod.getFile();
+            if (this.jsonVersion.getCaseAllFiles() == CaseType.upper) {
+                file = file.substring(0, file.lastIndexOf(".")).toUpperCase() + file.substring(file.lastIndexOf("."));
+            } else if (this.jsonVersion.getCaseAllFiles() == CaseType.lower) {
+                file = file.substring(0, file.lastIndexOf(".")).toLowerCase() + file.substring(file.lastIndexOf("."));
+            }
+
+            this.modsInstalled.add(new DisableableMod(mod.getName(), mod.getVersion(), mod.isOptional(), file, Type
+                .valueOf(Type.class, mod.getType().toString()), this.jsonVersion.getColour(mod.getColour()), mod
+                .getDescription(), false, false, false));
+        }
+
         return true;
     }
 
@@ -1303,7 +1336,7 @@ public class InstanceInstaller extends SwingWorker<Boolean, Void> {
             this.jsonVersion = Gsons.DEFAULT.fromJson(this.pack.getJSON(version.getVersion()), Version.class);
             return installUsingJSON();
         } catch (JsonParseException e) {
-            App.settings.logStackTrace("Couldn't parse JSON of pack!", e);
+            LogManager.logStackTrace("Couldn't parse JSON of pack!", e);
         }
 
         return false;
@@ -1364,8 +1397,8 @@ public class InstanceInstaller extends SwingWorker<Boolean, Void> {
                 if (found) {
                     this.extraArguments = this.jsonVersion.getExtraArguments().getArguments();
                 }
-            } else if (this.jsonVersion.getMainClass().hasDependsGroup()) {
-                String depends = this.jsonVersion.getMainClass().getDependsGroup();
+            } else if (this.jsonVersion.getExtraArguments().hasDependsGroup()) {
+                String depends = this.jsonVersion.getExtraArguments().getDependsGroup();
                 boolean found = false;
                 for (Mod mod : this.selectedMods) {
                     if (!mod.hasGroup()) {
@@ -1483,7 +1516,7 @@ public class InstanceInstaller extends SwingWorker<Boolean, Void> {
                 shareCodeData = response.getDataAsString();
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LogManager.logStackTrace("API call failed", e);
         }
 
         return shareCodeData;

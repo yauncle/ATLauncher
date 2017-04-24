@@ -17,24 +17,6 @@
  */
 package com.atlauncher.gui.dialogs;
 
-import com.atlauncher.App;
-import com.atlauncher.data.Instance;
-import com.atlauncher.data.Language;
-import com.atlauncher.data.Pack;
-import com.atlauncher.data.PackVersion;
-import com.atlauncher.utils.HTMLUtils;
-import com.atlauncher.utils.Utils;
-import com.atlauncher.workers.InstanceInstaller;
-
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JDialog;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JProgressBar;
-import javax.swing.JTextField;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -49,8 +31,29 @@ import java.beans.PropertyChangeListener;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
 
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JDialog;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JProgressBar;
+import javax.swing.JTextField;
+
+import com.atlauncher.App;
+import com.atlauncher.LogManager;
+import com.atlauncher.data.Instance;
+import com.atlauncher.data.Language;
+import com.atlauncher.data.Pack;
+import com.atlauncher.data.PackVersion;
+import com.atlauncher.utils.HTMLUtils;
+import com.atlauncher.utils.Utils;
+import com.atlauncher.workers.InstanceInstaller;
+
 public class InstanceInstallerDialog extends JDialog {
     private static final long serialVersionUID = -6984886874482721558L;
+    private int versionLength = 0;
     private boolean isReinstall = false;
     private boolean isServer = false;
     private Pack pack = null;
@@ -185,7 +188,19 @@ public class InstanceInstallerDialog extends JDialog {
                 break;
             }
         }
-        versionsDropDown.setPreferredSize(new Dimension(200, 25));
+
+        // ensures that font width is taken into account
+        for (PackVersion version : versions) {
+            versionLength = Math.max(versionLength, getFontMetrics(Utils.getFont()).stringWidth(version.toString()) + 25);
+        }
+
+        // ensures that the dropdown is at least 200 px wide
+        versionLength = Math.max(200, versionLength);
+
+        // ensures that there is a maximum width of 250 px to prevent overflow
+        versionLength = Math.min(250, versionLength);
+
+        versionsDropDown.setPreferredSize(new Dimension(versionLength, 25));
         middle.add(versionsDropDown, gbc);
 
         if (autoInstallVersion != null) {
@@ -320,10 +335,11 @@ public class InstanceInstallerDialog extends JDialog {
                         } else {
                             try {
                                 success = get();
-                            } catch (InterruptedException e) {
-                                App.settings.logStackTrace(e);
+                            } catch (InterruptedException ignored) {
+                                Thread.currentThread().interrupt();
+                                return;
                             } catch (ExecutionException e) {
-                                App.settings.logStackTrace(e);
+                                LogManager.logStackTrace(e);
                             }
                             if (success) {
                                 type = JOptionPane.INFORMATION_MESSAGE;
@@ -338,6 +354,7 @@ public class InstanceInstallerDialog extends JDialog {
                                 if (isReinstall) {
                                     instance.setVersion(version.getVersion());
                                     instance.setMinecraftVersion(version.getMinecraftVersion().getVersion());
+                                    instance.setVersionType(version.getMinecraftVersion().getMojangVersion().getType());
                                     instance.setModsInstalled(this.getModsInstalled());
                                     instance.setJarOrder(this.getJarOrder());
                                     instance.setMemory(this.getMemory());
@@ -363,12 +380,14 @@ public class InstanceInstallerDialog extends JDialog {
 
                                 } else {
                                     Instance newInstance = new Instance(instanceNameField.getText(), pack.getName(),
-                                            pack, enableUserLock.isSelected(), version.getVersion(), version
-                                            .getMinecraftVersion().getVersion(), this.getMemory(), this.getPermGen(),
-                                            this.getModsInstalled(), this.getJarOrder(), this.getLibrariesNeeded(),
-                                            this.getExtraArguments(), this.getMinecraftArguments(), this.getMainClass
-                                            (), version.getMinecraftVersion().getMojangVersion().getAssets(), version
-                                            .isDev(), !version.getMinecraftVersion().isLegacy());
+                                        pack, enableUserLock.isSelected(), version.getVersion(), version
+                                        .getMinecraftVersion().getVersion(),
+                                        version.getMinecraftVersion().getMojangVersion().getType(), this.getMemory(),
+                                        this.getPermGen(), this.getModsInstalled(), this.getJarOrder(),
+                                        this.getLibrariesNeeded(), this.getExtraArguments(),
+                                        this.getMinecraftArguments(), this.getMainClass(),
+                                        version.getMinecraftVersion().getMojangVersion().getAssets(), version.isDev(),
+                                        !version.getMinecraftVersion().isLegacy());
 
                                     if (version.isDev() && (version.getHash() != null)) {
                                         newInstance.setHash(version.getHash());

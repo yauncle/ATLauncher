@@ -128,13 +128,13 @@ public class LegacyMCLauncher {
             arguments.add("-Xmx" + App.settings.getMaximumMemory() + "M");
         }
         if (App.settings.getPermGen() < instance.getPermGen() && (Utils.getMaximumRam() / 8) < instance.getPermGen()) {
-            if (Utils.isJava8()) {
+            if (Utils.useMetaspace()) {
                 arguments.add("-XX:MetaspaceSize=" + instance.getPermGen() + "M");
             } else {
                 arguments.add("-XX:PermSize=" + instance.getPermGen() + "M");
             }
         } else {
-            if (Utils.isJava8()) {
+            if (Utils.useMetaspace()) {
                 arguments.add("-XX:MetaspaceSize=" + App.settings.getPermGen() + "M");
             } else {
                 arguments.add("-XX:PermSize=" + App.settings.getPermGen() + "M");
@@ -163,7 +163,7 @@ public class LegacyMCLauncher {
                             continue;
                         }
 
-                        if (arg.substring(0, 5).equalsIgnoreCase("-XX:+")) {
+                        if (arg.startsWith("-XX:+")) {
                             if (instance.getExtraArguments().contains("-XX:-" + arg.substring(5))) {
                                 negatedArgs.add("-XX:-" + arg.substring(5));
                                 LogManager.error("Argument " + arg + " is negated by pack developer and not added!");
@@ -190,10 +190,10 @@ public class LegacyMCLauncher {
             pathh = URLDecoder.decode(pathh, "UTF-8");
         } catch (UnsupportedEncodingException e) {
             pathh = System.getProperty("java.class.path");
-            App.settings.logStackTrace(e);
+            LogManager.logStackTrace(e);
         } catch (IOException e) {
             pathh = System.getProperty("java.class.path");
-            App.settings.logStackTrace(e);
+            LogManager.logStackTrace(e);
         }
         System.out.println(System.getProperty("java.class.path"));
         arguments.add(pathh + cpb.toString());
@@ -407,12 +407,6 @@ public class LegacyMCLauncher {
                 } catch (InstantiationException e) {
                     System.out.println("Applet wrapper failed! Falling back " + "to compatibility mode.");
                     mc.getMethod("main", String[].class).invoke(null, (Object) mcArgs);
-                } finally {
-                    try {
-                        cl.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
                 }
             }
         } catch (ClassNotFoundException e) {

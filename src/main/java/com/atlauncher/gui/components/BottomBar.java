@@ -48,6 +48,7 @@ public abstract class BottomBar extends JPanel {
         this.add(this.rightSide, BorderLayout.EAST);
         this.setupSocialButtonListeners();
         /*this.rightSide.add(this.nodeCraftIcon);
+        this.rightSide.add(this.discordIcon);											 
         this.rightSide.add(this.facebookIcon);*/
         this.rightSide.add(this.githubIcon);
         /*this.rightSide.add(this.redditIcon);
@@ -58,31 +59,37 @@ public abstract class BottomBar extends JPanel {
         nodeCraftIcon.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 LogManager.info("Opening Up NodeCraft");
-                Utils.openBrowser("https://nodecraft.com/?ref=atl&utm_source=ATL&utm_medium=launcher");
+                Utils.openBrowser("https://atl.pw/nodecraft-from-launcher");
+            }
+        });
+        discordIcon.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                LogManager.info("Opening Up ATLauncher Discord");
+                Utils.openBrowser("https://atl.pw/discord");
             }
         });
         facebookIcon.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 LogManager.info("Opening Up ATLauncher Facebook Page");
-                Utils.openBrowser("http://www.facebook.com/ATLauncher");
+                Utils.openBrowser("https://atl.pw/facebook");
             }
         });
         githubIcon.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                LogManager.info("Opening Up HCLauncher GitHub Page");
-                Utils.openBrowser("https://git.world-three.net/Yauncle/ATLauncher");
+                LogManager.info("Opening Up ATLauncher GitHub Page");
+                Utils.openBrowser("https://atl.pw/github-launcher-3");
             }
         });
         redditIcon.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 LogManager.info("Opening Up ATLauncher Reddit Page");
-                Utils.openBrowser("http://www.reddit.com/r/ATLauncher");
+                Utils.openBrowser("https://atl.pw/reddit");
             }
         });
         twitterIcon.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 LogManager.info("Opening Up ATLauncher Twitter Page");
-                Utils.openBrowser("http://www.twitter.com/ATLauncher");
+                Utils.openBrowser("https://atl.pw/twitter");
             }
         });
     }
