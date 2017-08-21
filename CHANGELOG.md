@@ -5,3 +5,5 @@
 - Add in version_type to the launch arguments
 - Fix dependsGroup on extraArguments not working correctly
 - Stop showing error dialog when no skin is set by the user and is using default
+## 3.2.3.9
+- Fix issues installing some libraries on OSX

@@ -18,7 +18,7 @@
 package com.atlauncher.data;
 
 public class Constants {
-    public static final LauncherVersion VERSION = new LauncherVersion(3, 2, 3, 7);
+    public static final LauncherVersion VERSION = new LauncherVersion(3, 2, 3, 9);
     public static final String LAUNCHER_NAME = "HCLauncher";
     public static final String API_BASE_URL = "https://api.yauncle.net/v1/launcher/";
     public static final String PASTE_CHECK_URL = "http://paste.pellens.one";
