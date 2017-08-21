@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.atlauncher</groupId>
     <artifactId>atlauncher</artifactId>
-    <name>ATLauncher</name>
+    <name>HCLauncher</name>
     <version>3.2.3.9</version>
     <organization>
         <name>ATLauncher</name>
