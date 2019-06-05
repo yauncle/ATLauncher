@@ -5,10 +5,10 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.atlauncher</groupId>
     <artifactId>atlauncher</artifactId>
-    <name>HCLauncher</name>
-    <version>3.2.3.9</version>
+    <name>ATLauncher</name>
+    <version>3.2.6.0</version>
     <organization>
-        <name>ATLauncher</name>
+        <name>HCLauncher</name>
         <url>http://www.github.com/ATLauncher/</url>
     </organization>
     <packaging>jar</packaging>
@@ -19,7 +19,7 @@
     <url>https://www.atlauncher.com</url>
 
     <properties>
-        <project.jdk.version>1.6</project.jdk.version>
+        <project.jdk.version>1.7</project.jdk.version>
         <mainclass>com.atlauncher.App</mainclass>
     </properties>
 
@@ -57,61 +57,22 @@
             <version>1.1.1</version>
             <scope>compile</scope>
         </dependency>
-		<dependency>
-			<groupId>org.tukaani</groupId>
-			<artifactId>xz</artifactId>
-			<version>1.5</version>
-			<scope>compile</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.mojang</groupId>
-			<artifactId>authlib</artifactId>
-			<version>1.5.17</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.logging.log4j</groupId>
-			<artifactId>log4j-api</artifactId>
-			<version>2.0-beta9</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.logging.log4j</groupId>
-			<artifactId>log4j-core</artifactId>
-			<version>2.0-beta9</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
-			<groupId>com.google.guava</groupId>
-			<artifactId>guava</artifactId>
-			<version>17.0</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.codehaus.mojo</groupId>
-			<artifactId>exec-maven-plugin</artifactId>
-			<version>1.6.0</version>
-			<scope>runtime</scope>
-		</dependency>
+        <dependency>
+            <groupId>org.tukaani</groupId>
+            <artifactId>xz</artifactId>
+            <version>1.5</version>
+            <scope>compile</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.mojang</groupId>
+            <artifactId>authlib</artifactId>
+            <version>1.5.26</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>exec-maven-plugin</artifactId>
-                <version>1.6.0</version>
-                <executions>
-                    <execution>
-                    <goals>
-                        <goal>java</goal>
-                    </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <mainClass>com.atlauncher.App</mainClass>
-                </configuration>
-            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
@@ -175,7 +136,7 @@
                                 <preCp>anything</preCp>
                             </classPath>
                             <jre>
-                                <minVersion>1.6.0</minVersion>
+                                <minVersion>1.7.0</minVersion>
                                 <runtimeBits>64/32</runtimeBits>
                             </jre>
                             <icon>src/main/resources/assets/image/Icon.ico</icon>
@@ -224,7 +185,7 @@
                                                 filemode="755"/>
                                 </zip>
                                 <delete dir="{project.build.directory}/${project.name}.app"/>
-                            </target>
+                           </target>
                         </configuration>
                         <goals>
                             <goal>run</goal>

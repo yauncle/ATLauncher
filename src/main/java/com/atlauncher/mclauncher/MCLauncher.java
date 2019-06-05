@@ -22,12 +22,17 @@ import com.atlauncher.LogManager;
 import com.atlauncher.data.Account;
 import com.atlauncher.data.Instance;
 import com.atlauncher.data.LoginResponse;
+import com.atlauncher.data.MinecraftVersion;
+import com.atlauncher.data.mojang.MojangVersion;
 import com.atlauncher.data.mojang.PropertyMapSerializer;
 import com.atlauncher.utils.Utils;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.mojang.authlib.properties.PropertyMap;
 import com.mojang.util.UUIDTypeAdapter;
+
+
+import com.atlauncher.data.Constants;
 
 import java.io.File;
 import java.io.IOException;
@@ -53,7 +58,7 @@ public class MCLauncher {
                     File thisFile = new File(jarMods, mod);
                     if (thisFile.exists()) {
                         cpb.append(File.pathSeparator);
-                        cpb.append(thisFile);
+                        cpb.append(thisFile.getAbsolutePath());
                     }
                 }
                 for (File file : jarModFiles) {
@@ -62,20 +67,23 @@ public class MCLauncher {
                     }
                     hasCustomJarMods = true;
                     cpb.append(File.pathSeparator);
-                    cpb.append(file);
+                    cpb.append(file.getAbsolutePath());
                 }
             } else {
                 for (File file : jarModFiles) {
                     hasCustomJarMods = true;
                     cpb.append(File.pathSeparator);
-                    cpb.append(file);
+                    cpb.append(file.getAbsolutePath());
                 }
             }
         }
 
-        for (String jarFile : instance.getLibrariesNeeded().split(",")) {
+        File librariesBaseDir = instance.usesNewLibraries() ? App.settings.getGameLibrariesDir()
+                : instance.getBinDirectory();
+
+        for (String jarFile : instance.getLibraries()) {
             cpb.append(File.pathSeparator);
-            cpb.append(new File(instance.getBinDirectory(), jarFile));
+            cpb.append(new File(librariesBaseDir, jarFile).getAbsolutePath());
         }
 
         File binFolder = instance.getBinDirectory();
@@ -83,7 +91,7 @@ public class MCLauncher {
         if (binFolder.exists() && libraryFiles != null && libraryFiles.length != 0) {
             for (File file : libraryFiles) {
                 if (file.isDirectory() || file.getName().equalsIgnoreCase(instance.getMinecraftJar().getName())
-                        || instance.getLibrariesNeeded().contains(file.getName())) {
+                        || instance.getLibraries().contains(file.getName())) {
                     continue;
                 }
 
@@ -94,8 +102,10 @@ public class MCLauncher {
             }
         }
 
-        cpb.append(File.pathSeparator);
-        cpb.append(instance.getMinecraftJar());
+        if (!instance.usesNewLibraries()) {
+            cpb.append(File.pathSeparator);
+            cpb.append(instance.getMinecraftJar().getAbsolutePath());
+        }
 
         List<String> arguments = new ArrayList<String>();
 
@@ -113,8 +123,8 @@ public class MCLauncher {
 
         String javaParams = App.settings.getJavaParameters();
 
-        if (javaParams.isEmpty()) {
-            // Mojang launcher defaults if user has no custom java arguments
+        if (javaParams.isEmpty() && !Utils.isMinecraftJavaNewerThanJava8()) {
+            // Some defaults if on Java 8 or less
             javaParams = "-XX:+UseConcMarkSweepGC -XX:+CMSIncrementalMode -XX:-UseAdaptiveSizePolicy";
         }
 
@@ -203,25 +213,50 @@ public class MCLauncher {
             props = gson.toJson(response.getAuth().getUserProperties());
         }
 
-        if (instance.hasMinecraftArguments()) {
-            String[] minecraftArguments = instance.getMinecraftArguments().split(" ");
-            for (String argument : minecraftArguments) {
+        List<String> launchArguments = new ArrayList<String>();
+
+        if (instance.hasArguments()) {
+            launchArguments.addAll(instance.getArguments());
+        } else {
+            MinecraftVersion minecraftVersion = instance.getActualMinecraftVersion();
+
+            if (minecraftVersion != null) {
+                MojangVersion mojangVersion = minecraftVersion.getMojangVersion();
+
+                if (mojangVersion.hasArguments()) {
+                    launchArguments = Arrays.asList(mojangVersion.getArguments().asString().split(" "));
+                } else {
+                    launchArguments = Arrays.asList(mojangVersion.getMinecraftArguments().split(" "));
+                }
+            } else if (instance.hasMinecraftArguments()) {
+                launchArguments = Arrays.asList(instance.getMinecraftArguments().split(" "));
+            }
+        }
+
+        if (launchArguments.size() != 0) {
+            for (String argument : launchArguments) {
                 argument = argument.replace("${auth_player_name}", account.getMinecraftUsername());
                 argument = argument.replace("${profile_name}", instance.getName());
                 argument = argument.replace("${user_properties}", props);
                 argument = argument.replace("${version_name}", instance.getMinecraftVersion());
                 argument = argument.replace("${game_directory}", instance.getRootDirectory().getAbsolutePath());
                 argument = argument.replace("${game_assets}", instance.getAssetsDir().getAbsolutePath());
-                argument = argument.replace("${assets_root}", App.settings.getResourcesDir().getAbsolutePath());
+                argument = argument.replace("${assets_root}", App.settings.getAssetsDir().getAbsolutePath());
                 argument = argument.replace("${assets_index_name}", instance.getAssets());
                 argument = argument.replace("${auth_uuid}", UUIDTypeAdapter.fromUUID(account.getRealUUID()));
                 argument = argument.replace("${auth_access_token}", account.getAccessToken());
                 argument = argument.replace("${auth_session}", account.getSession(response));
                 argument = argument.replace("${version_type}", instance.getVersionType());
+                argument = argument.replace("${launcher_name}", Constants.LAUNCHER_NAME);
+                argument = argument.replace("${launcher_version}", Constants.VERSION.toString());
+                argument = argument.replace("${natives_directory}", instance.getNativesDirectory().getAbsolutePath());
                 argument = argument.replace("${user_type}",
                         response.isOffline() ? com.mojang.authlib.UserType.MOJANG.getName()
                                 : response.getAuth().getUserType().getName());
-                arguments.add(argument);
+
+                if (!argument.equalsIgnoreCase("-cp") && !argument.equalsIgnoreCase("${classpath}")) {
+                    arguments.add(argument);
+                }
             }
         } else {
             arguments.add("--username=" + account.getMinecraftUsername());
@@ -234,8 +269,9 @@ public class MCLauncher {
 
             arguments.add("--version=" + instance.getMinecraftVersion());
             arguments.add("--gameDir=" + instance.getRootDirectory().getAbsolutePath());
-            arguments.add("--assetsDir=" + App.settings.getResourcesDir().getAbsolutePath());
+            arguments.add("--assetsDir=" + App.settings.getAssetsDir().getAbsolutePath());
         }
+
         if (App.settings.startMinecraftMaximised()) {
             arguments.add("--width=" + Utils.getMaximumWindowWidth());
             arguments.add("--height=" + Utils.getMaximumWindowHeight());

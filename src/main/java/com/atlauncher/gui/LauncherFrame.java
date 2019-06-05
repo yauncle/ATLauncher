@@ -51,6 +51,8 @@ import java.util.List;
 public final class LauncherFrame extends JFrame implements RelocalizationListener {
     private JTabbedPane tabbedPane;
     private NewsTab newsTab;
+    private PacksTab vanillaPacksTab;
+    private PacksTab featuredPacksTab;
     private PacksTab packsTab;
     private InstancesTab instancesTab;
     private AccountsTab accountsTab;
@@ -67,7 +69,7 @@ public final class LauncherFrame extends JFrame implements RelocalizationListene
         LogManager.info("*(Not Actually)");
 
         App.settings.setParentFrame(this);
-        setSize(new Dimension(1000, 615));
+        setSize(new Dimension(1200, 700));
         setTitle(Constants.LAUNCHER_NAME + " " + Constants.VERSION);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
@@ -104,11 +106,12 @@ public final class LauncherFrame extends JFrame implements RelocalizationListene
             Pack pack = App.settings.getPackBySafeName(App.packToInstall);
 
             if (pack != null && pack.isSemiPublic() && !App.settings.canViewSemiPublicPackByCode(pack.getCode())) {
-                LogManager.error("Error automatically installing " + pack.getName() + " as you don't have the " +
-                        "pack added to the launcher!");
+                LogManager.error("Error automatically installing " + pack.getName() + " as you don't have the "
+                        + "pack added to the launcher!");
             } else {
                 if (App.settings.isInOfflineMode() || App.settings.getAccount() == null || pack == null) {
-                    LogManager.error("Error automatically installing " + (pack == null ? "pack" : pack.getName()) + "!");
+                    LogManager
+                            .error("Error automatically installing " + (pack == null ? "pack" : pack.getName()) + "!");
                 } else {
                     new InstanceInstallerDialog(pack);
                 }
@@ -122,8 +125,8 @@ public final class LauncherFrame extends JFrame implements RelocalizationListene
                 Pack pack = App.settings.getPackBySafeName(parts[0]);
 
                 if (pack != null && pack.isSemiPublic() && !App.settings.canViewSemiPublicPackByCode(pack.getCode())) {
-                    LogManager.error("Error automatically installing " + pack.getName() + " as you don't have the " +
-                            "pack added to the launcher!");
+                    LogManager.error("Error automatically installing " + pack.getName() + " as you don't have the "
+                            + "pack added to the launcher!");
                 } else {
                     if (pack == null) {
                         LogManager.error("Error automatically installing pack from share code!");
@@ -155,17 +158,27 @@ public final class LauncherFrame extends JFrame implements RelocalizationListene
 
         newsTab = new NewsTab();
         App.settings.setNewsPanel(newsTab);
-        packsTab = new PacksTab();
+
+        vanillaPacksTab = new PacksTab(false, true);
+        App.settings.setVanillaPacksPanel(vanillaPacksTab);
+
+        featuredPacksTab = new PacksTab(true, false);
+        App.settings.setFeaturedPacksPanel(featuredPacksTab);
+
+        packsTab = new PacksTab(false, false);
         App.settings.setPacksPanel(packsTab);
+
         instancesTab = new InstancesTab();
         App.settings.setInstancesPanel(instancesTab);
+
         accountsTab = new AccountsTab();
         toolsTab = new ToolsTab();
         settingsTab = new SettingsTab();
 
-        this.tabs = Arrays.asList(new Tab[]{newsTab, packsTab, instancesTab, accountsTab, toolsTab, settingsTab});
+        this.tabs = Arrays.asList(
+                new Tab[] { newsTab, vanillaPacksTab, featuredPacksTab, packsTab, instancesTab, accountsTab, toolsTab, settingsTab });
 
-        tabbedPane.setFont(App.THEME.getTabFont().deriveFont(34.0F));
+        tabbedPane.setFont(App.THEME.getTabFont().deriveFont(32.0F));
         for (Tab tab : this.tabs) {
             this.tabbedPane.addTab(tab.getTitle(), (JPanel) tab);
         }

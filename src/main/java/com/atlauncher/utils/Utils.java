@@ -55,7 +55,6 @@ import java.net.Proxy;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.net.URLConnection;
 import java.net.URLEncoder;
 import java.nio.channels.FileChannel;
@@ -136,7 +135,7 @@ public class Utils {
                 LogManager.logStackTrace("Failed to open theme zip file", e);
                 return null;
             }
-            
+
             try {
                 Enumeration<? extends ZipEntry> entries = zipFile.entries();
 
@@ -184,8 +183,9 @@ public class Utils {
 
         if (Utils.isLinux()) {
             try {
-                return new File(App.class.getProtectionDomain().getCodeSource().getLocation().toURI()
-                    .getSchemeSpecificPart()).getParentFile();
+                return new File(
+                        App.class.getProtectionDomain().getCodeSource().getLocation().toURI().getSchemeSpecificPart())
+                                .getParentFile();
             } catch (URISyntaxException e) {
                 LogManager.logStackTrace("URI syntax error", e);
                 return new File(System.getProperty("user.dir"), Constants.LAUNCHER_NAME);
@@ -197,12 +197,13 @@ public class Utils {
 
     public static File getOSStorageDir() {
         switch (OperatingSystem.getOS()) {
-            case WINDOWS:
-                return new File(System.getenv("APPDATA"), "/." + Constants.LAUNCHER_NAME.toLowerCase());
-            case OSX:
-                return new File(System.getProperty("user.home"), "/Library/Application Support/." + Constants.LAUNCHER_NAME.toLowerCase());
-            default:
-                return new File(System.getProperty("user.home"), "/." + Constants.LAUNCHER_NAME.toLowerCase());
+        case WINDOWS:
+            return new File(System.getenv("APPDATA"), "/." + Constants.LAUNCHER_NAME.toLowerCase());
+        case OSX:
+            return new File(System.getProperty("user.home"),
+                    "/Library/Application Support/." + Constants.LAUNCHER_NAME.toLowerCase());
+        default:
+            return new File(System.getProperty("user.home"), "/." + Constants.LAUNCHER_NAME.toLowerCase());
         }
     }
 
@@ -249,7 +250,7 @@ public class Utils {
         File themeFile = App.settings == null ? null : App.settings.getThemeFile();
 
         if (themeFile != null) {
-    
+
             ZipFile zipFile;
             try {
                 zipFile = new ZipFile(themeFile);
@@ -260,10 +261,10 @@ public class Utils {
                 LogManager.logStackTrace("Failed to open theme zip file", e);
                 return null;
             }
-            
+
             try {
                 Enumeration<? extends ZipEntry> entries = zipFile.entries();
-        
+
                 InputStream stream = null;
                 while (entries.hasMoreElements()) {
                     ZipEntry entry = entries.nextElement();
@@ -296,7 +297,7 @@ public class Utils {
         if (stream == null) {
             throw new NullPointerException("Stream == null");
         }
-    
+
         try {
             return ImageIO.read(stream);
         } catch (IOException e) {
@@ -497,8 +498,9 @@ public class Utils {
     }
 
     /**
-     * Returns the maximum RAM available to Java. If on 64 Bit system then its all of the System RAM otherwise its
-     * limited to 1GB or less due to allocations of PermGen
+     * Returns the maximum RAM available to Java. If on 64 Bit system then its all
+     * of the System RAM otherwise its limited to 1GB or less due to allocations of
+     * PermGen
      *
      * @return The maximum RAM available to Java
      */
@@ -516,8 +518,9 @@ public class Utils {
     }
 
     /**
-     * Returns the safe amount of maximum ram available to Java. This is set to half of the total maximum ram available
-     * to Java in order to not allocate too much and leave enough RAM for the OS and other application
+     * Returns the safe amount of maximum ram available to Java. This is set to half
+     * of the total maximum ram available to Java in order to not allocate too much
+     * and leave enough RAM for the OS and other application
      *
      * @return Half the maximum RAM available to Java
      */
@@ -707,6 +710,36 @@ public class Utils {
     }
 
     /**
+     * Gets the md5 hex.
+     *
+     * @param string the string
+     * @return the m d5
+     */
+    public static String getMD5Hex(String string) {
+        if (string == null) {
+            LogManager.error("Cannot get MD5 of null");
+            return "0"; // String null so return 0
+        }
+        StringBuffer sb = null;
+        try {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] bytesOfMessage = string.getBytes("UTF-8");
+            byte[] mdbytes = md.digest(bytesOfMessage);
+
+            // convert the byte to hex format method 1
+            sb = new StringBuffer();
+            for (int i = 0; i < mdbytes.length; i++) {
+                sb.append(Integer.toString((mdbytes[i] & 0xff) + 0x100, 16).substring(1));
+            }
+        } catch (NoSuchAlgorithmException e) {
+            LogManager.logStackTrace(e);
+        } catch (IOException e) {
+            LogManager.logStackTrace(e);
+        }
+        return sb.toString();
+    }
+
+    /**
      * Move file.
      *
      * @param from         the from
@@ -745,12 +778,12 @@ public class Utils {
      */
     public static boolean copyFile(File from, File to, boolean withFilename) {
         if (!from.isFile()) {
-            LogManager.error("File " + from.getAbsolutePath() + " cannot be copied to " + to.getAbsolutePath() + " as" +
-                " it isn't a file");
+            LogManager.error("File " + from.getAbsolutePath() + " cannot be copied to " + to.getAbsolutePath() + " as"
+                    + " it isn't a file");
         }
         if (!from.exists()) {
-            LogManager.error("File " + from.getAbsolutePath() + " cannot be copied to " + to.getAbsolutePath() + " as" +
-                " it doesn't exist");
+            LogManager.error("File " + from.getAbsolutePath() + " cannot be copied to " + to.getAbsolutePath() + " as"
+                    + " it doesn't exist");
             return false;
         }
         if (!withFilename) {
@@ -769,6 +802,8 @@ public class Utils {
 
         FileChannel source = null;
         FileChannel destination = null;
+
+        LogManager.debug("Copying file from " + from.getAbsolutePath() + " to " + to.getAbsolutePath());
 
         try {
             source = new FileInputStream(from).getChannel();
@@ -835,8 +870,8 @@ public class Utils {
             delete(sourceLocation);
             return true;
         } else {
-            LogManager.error("Couldn't move directory " + sourceLocation.getAbsolutePath() + " to " + targetLocation
-                .getAbsolutePath());
+            LogManager.error("Couldn't move directory " + sourceLocation.getAbsolutePath() + " to "
+                    + targetLocation.getAbsolutePath());
             return false;
         }
     }
@@ -987,8 +1022,8 @@ public class Utils {
         }
 
         if (!file.delete()) {
-            LogManager.error((file.isFile() ? "File" : "Folder") + " " + file.getAbsolutePath() + " couldn't be " +
-                "deleted");
+            LogManager.error(
+                    (file.isFile() ? "File" : "Folder") + " " + file.getAbsolutePath() + " couldn't be " + "deleted");
         }
     }
 
@@ -1003,17 +1038,17 @@ public class Utils {
             canon = file;
         } else {
             File canonDir = null;
-    
+
             try {
                 canonDir = file.getParentFile().getCanonicalFile();
             } catch (IOException e) {
                 LogManager.logStackTrace("Failed to get canonical file", e);
                 return false;
             }
-    
+
             canon = new File(canonDir, file.getName());
         }
-    
+
         try {
             return !canon.getCanonicalFile().equals(canon.getAbsoluteFile());
         } catch (IOException e) {
@@ -1051,8 +1086,8 @@ public class Utils {
                 spreadOutResourceFiles(file);
             } else {
                 String hash = getSHA1(file);
-                File saveTo = new File(App.settings.getObjectsAssetsDir(), hash.substring(0, 2) + File.separator +
-                    hash);
+                File saveTo = new File(App.settings.getObjectsAssetsDir(),
+                        hash.substring(0, 2) + File.separator + hash);
                 saveTo.mkdirs();
                 copyFile(file, saveTo, true);
             }
@@ -1247,7 +1282,7 @@ public class Utils {
      * @throws IOException Signals that an I/O exception has occurred.
      */
     public static void replaceText(File originalFile, File destinationFile, String replaceThis, String withThis)
-        throws IOException {
+            throws IOException {
 
         FileInputStream fs = new FileInputStream(originalFile);
         BufferedReader br = new BufferedReader(new InputStreamReader(fs));
@@ -1464,10 +1499,11 @@ public class Utils {
     public static String getMinecraftJavaVersion() {
         if (App.settings.isUsingCustomJavaPath()) {
             File folder = new File(App.settings.getJavaPath(), "bin/");
-            String javaCommand = folder + File.separator + "java" + (isWindows() ? ".exe" : "");
+            String javaFile = App.settings.getJavaPath() + File.separator + "bin" + File.separator + "java"
+                    + (isWindows() ? "w" : "");
 
-            ProcessBuilder processBuilder = new ProcessBuilder(javaCommand, "-version");
-            processBuilder.directory(folder);
+            ProcessBuilder processBuilder = new ProcessBuilder(javaFile, "-version");
+            processBuilder.directory(folder.getAbsoluteFile());
             processBuilder.redirectErrorStream(true);
 
             String version = "Unknown";
@@ -1477,14 +1513,14 @@ public class Utils {
                 BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()));
                 try {
                     String line = null;
-                    Pattern p = Pattern.compile("java version \"([^\"]*)\"");
+                    Pattern p = Pattern.compile("(java|openjdk) version \"([^\"]*)\"");
 
                     while ((line = br.readLine()) != null) {
                         // Extract version information
                         Matcher m = p.matcher(line);
 
                         if (m.find()) {
-                            version = m.group(1);
+                            version = m.group(2);
                             break;
                         }
                     }
@@ -1495,7 +1531,9 @@ public class Utils {
                 LogManager.logStackTrace(e);
             }
 
-            LogManager.warn("Cannot get Java version from the ouput of \"" + javaCommand + "\" -version");
+            if (version.equals("Unknown")) {
+                LogManager.warn("Cannot get Java version from the output of \"" + javaFile + " -version\"");
+            }
 
             return version;
         } else {
@@ -1504,7 +1542,8 @@ public class Utils {
     }
 
     /**
-     * Parse a Java version string and get the major version number. For example "1.8.0_91" is parsed to 8.
+     * Parse a Java version string and get the major version number. For example
+     * "1.8.0_91" is parsed to 8.
      *
      * @param version the version string to parse
      * @return the parsed major version number
@@ -1539,10 +1578,8 @@ public class Utils {
      * @return the Java versions used by the Launcher and Minecraft as a string
      */
     public static String getActualJavaVersion() {
-        return String.format("Launcher: Java %d (%s), Minecraft: Java %d (%s)",
-            getLauncherJavaVersionNumber(), getLauncherJavaVersion(),
-            getMinecraftJavaVersionNumber(), getMinecraftJavaVersion()
-        );
+        return String.format("Launcher: Java %d (%s), Minecraft: Java %d (%s)", getLauncherJavaVersionNumber(),
+                getLauncherJavaVersion(), getMinecraftJavaVersionNumber(), getMinecraftJavaVersion());
     }
 
     /**
@@ -1553,6 +1590,14 @@ public class Utils {
     public static boolean isJava7OrAbove(boolean checkCustomPath) {
         int version = checkCustomPath ? getMinecraftJavaVersionNumber() : getLauncherJavaVersionNumber();
         return version >= 7 || version == -1;
+    }
+
+    public static boolean isSystemJavaNewerThanJava8() {
+        return getLauncherJavaVersionNumber() >= 9;
+    }
+
+    public static boolean isMinecraftJavaNewerThanJava8() {
+        return getMinecraftJavaVersionNumber() >= 9;
     }
 
     /**
@@ -1574,7 +1619,8 @@ public class Utils {
     }
 
     /**
-     * Checks whether Metaspace should be used instead of PermGen. This is the case for Java 8 and above.
+     * Checks whether Metaspace should be used instead of PermGen. This is the case
+     * for Java 8 and above.
      *
      * @return whether Metaspace should be used instead of PermGen
      */
@@ -1600,19 +1646,20 @@ public class Utils {
     }
 
     /**
-     * Sends a pending crash report generated by OpenEye and retrieves and returns it's response to display to the
-     * user.
+     * Sends a pending crash report generated by OpenEye and retrieves and returns
+     * it's response to display to the user.
      *
-     * @param report a {@link File} object of the pending crash report to send the contents of
-     * @return the response received from OpenEye about the crash that was sent which is of {@link
-     * OpenEyeReportResponse} type
+     * @param report a {@link File} object of the pending crash report to send the
+     *               contents of
+     * @return the response received from OpenEye about the crash that was sent
+     *         which is of {@link OpenEyeReportResponse} type
      */
     public static OpenEyeReportResponse sendOpenEyePendingReport(File report) {
         StringBuilder response = null;
         String request = Utils.getFileContents(report);
         if (request == null) {
-            LogManager.error("OpenEye: Couldn't read contents of file '" + report.getAbsolutePath() + "'. Pending " +
-                "report sending failed!");
+            LogManager.error("OpenEye: Couldn't read contents of file '" + report.getAbsolutePath() + "'. Pending "
+                    + "report sending failed!");
             return null;
         }
 
@@ -1664,7 +1711,8 @@ public class Utils {
             }
         }
 
-        // Return an OpenEyeReportResponse object from the singular array returned in JSON
+        // Return an OpenEyeReportResponse object from the singular array returned in
+        // JSON
         return Gsons.DEFAULT.fromJson(response.toString(), OpenEyeReportResponse[].class)[0];
     }
 
@@ -1707,7 +1755,8 @@ public class Utils {
     }
 
     /**
-     * This splits up a string into a multi lined string by adding a separator at every space after a given count.
+     * This splits up a string into a multi lined string by adding a separator at
+     * every space after a given count.
      *
      * @param string        the string to split up
      * @param maxLineLength the number of characters minimum to have per line
@@ -1787,7 +1836,8 @@ public class Utils {
     }
 
     /**
-     * Counts the numbers of non transparent pixels in a given {@link BufferedImage}.
+     * Counts the numbers of non transparent pixels in a given
+     * {@link BufferedImage}.
      *
      * @param image The image to count the number of non transparent pixels in
      * @return The number of non transparent pixels
@@ -1949,7 +1999,7 @@ public class Utils {
             type = LogType.INFO;
         }
 
-        return new Object[]{type, message};
+        return new Object[] { type, message };
     }
 
     public static byte[] readFile(File file) {
@@ -2038,8 +2088,8 @@ public class Utils {
         }
 
         int x = decompressed.length;
-        int len = ((decompressed[x - 8] & 0xFF)) | ((decompressed[x - 7] & 0xFF) << 8) | ((decompressed[x - 6] &
-            0xFF) << 16) | ((decompressed[x - 5] & 0xFF) << 24);
+        int len = ((decompressed[x - 8] & 0xFF)) | ((decompressed[x - 7] & 0xFF) << 8)
+                | ((decompressed[x - 6] & 0xFF) << 16) | ((decompressed[x - 5] & 0xFF) << 24);
         byte[] checksums = Arrays.copyOfRange(decompressed, decompressed.length - len - 8, decompressed.length - 8);
         try {
             FileOutputStream jarBytes = new FileOutputStream(output);
@@ -2066,7 +2116,8 @@ public class Utils {
 
             NetworkInterface network = NetworkInterface.getByInetAddress(ip);
 
-            // If network is null, user may be using Linux or something it doesn't support so try alternative way
+            // If network is null, user may be using Linux or something it doesn't support
+            // so try alternative way
             if (network == null) {
                 Enumeration e = NetworkInterface.getNetworkInterfaces();
 
@@ -2104,56 +2155,30 @@ public class Utils {
         return getMD5(returnStr);
     }
 
-    /**
-     * Credit to https://github.com/Slowpoke101/FTBLaunch/blob/master/src/main/java/net/ftb/workers/AuthlibDLWorker.java
-     */
-    public static boolean addToClasspath(File file) {
-        LogManager.info("Loading external library " + file.getName() + " to classpath");
-        try {
-            if (file.exists()) {
-                addURL(file.toURI().toURL());
-            } else {
-                LogManager.error("Error loading AuthLib");
-            }
-        } catch (Throwable t) {
-            if (t.getMessage() != null) {
-                LogManager.error(t.getMessage());
-            }
-            return false;
+    public static String convertMavenIdentifierToPath(String identifier) {
+        String[] parts = identifier.split(":", 3);
+        String name = parts[1];
+        String version = parts[2];
+        String extension = "jar";
+        String classifier = "";
+
+        if (version.indexOf('@') != -1) {
+            extension = version.substring(version.indexOf('@') + 1, version.length());
+            version = version.substring(0, version.indexOf('@'));
         }
 
-        return true;
+        if (version.indexOf(':') != -1) {
+            classifier = "-" + version.substring(version.indexOf(':') + 1, version.length());
+            version = version.substring(0, version.indexOf(':'));
+        }
+
+        String path = parts[0].replace(".", "/") + "/" + name + "/" + version + "/" + name + "-" + version + classifier
+                + "." + extension;
+
+        return path;
     }
 
-    public static boolean checkAuthLibLoaded() {
-        try {
-            App.settings.getClass().forName("com.mojang.authlib.exceptions.AuthenticationException");
-            App.settings.getClass().forName("com.mojang.authlib.Agent");
-            App.settings.getClass().forName("com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService");
-            App.settings.getClass().forName("com.mojang.authlib.yggdrasil.YggdrasilUserAuthentication");
-        } catch (ClassNotFoundException e) {
-            LogManager.logStackTrace(e);
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Credit to https://github.com/Slowpoke101/FTBLaunch/blob/master/src/main/java/net/ftb/workers/AuthlibDLWorker.java
-     */
-    public static void addURL(URL u) throws IOException {
-        URLClassLoader sysloader = (URLClassLoader) App.settings.getClass().getClassLoader();
-        Class sysclass = URLClassLoader.class;
-        try {
-            Method method = sysclass.getDeclaredMethod("addURL", URL.class);
-            method.setAccessible(true);
-            method.invoke(sysloader, u);
-        } catch (Throwable t) {
-            if (t.getMessage() != null) {
-                LogManager.error(t.getMessage());
-            }
-            throw new IOException("Error, could not add URL to system classloader");
-        }
+    public static File convertMavenIdentifierToFile(String identifier, File base) {
+        return new File(base, convertMavenIdentifierToPath(identifier).replace("/", File.separatorChar + ""));
     }
 }

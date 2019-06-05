@@ -40,14 +40,16 @@ import com.atlauncher.Gsons;
 import com.atlauncher.LogManager;
 import com.atlauncher.data.openmods.OpenEyeReportResponse;
 import com.atlauncher.gui.dialogs.ProgressDialog;
-import com.atlauncher.mclauncher.LegacyMCLauncher;
 import com.atlauncher.mclauncher.MCLauncher;
 import com.atlauncher.utils.HTMLUtils;
 import com.atlauncher.utils.Utils;
 
+import com.atlauncher.exceptions.InvalidMinecraftVersion;
+
 /**
- * This class handles contains information about a single Instance in the Launcher. An Instance being an installed
- * version of a ModPack separate to others by file structure.
+ * This class handles contains information about a single Instance in the
+ * Launcher. An Instance being an installed version of a ModPack separate to
+ * others by file structure.
  */
 public class Instance implements Cloneable {
     /**
@@ -61,7 +63,8 @@ public class Instance implements Cloneable {
     private String pack;
 
     /**
-     * The username of the user who installed this if it's set to be for that user only.
+     * The username of the user who installed this if it's set to be for that user
+     * only.
      */
     private String installedBy;
 
@@ -96,30 +99,45 @@ public class Instance implements Cloneable {
     private int memory = 0;
 
     /**
-     * The minimum PermGen/MetaSpace recommended for this Instance by the pack developer/s.
+     * The minimum PermGen/MetaSpace recommended for this Instance by the pack
+     * developer/s.
      */
     private int permgen = 0;
 
     /**
-     * Comma separated list of the order of Jar's to be added to the class path when launching Minecraft.
+     * Comma separated list of the order of Jar's to be added to the class path when
+     * launching Minecraft.
      */
     private String jarOrder;
 
     /**
-     * Comma seperated list of the libraries needed by Minecraft/Forge to be added to the class path when launching
-     * Minecraft.
+     * Array of paths for the libraries needed to be loaded.
+     */
+    private List<String> libraries;
+
+    /**
+     * Array of paths for the libraries needed to be loaded.
+     */
+    private List<String> arguments;
+
+    /**
+     * Comma seperated list of the libraries needed by Minecraft/Forge to be added
+     * to the class path when launching Minecraft.
+     *
+     * @deprecated
      */
     private String librariesNeeded = null;
 
     /**
-     * The extra arguments to be added to the command when launching Minecraft. Generally involves things such as the
-     * tweakClass/s for Forge.
+     * The extra arguments to be added to the command when launching Minecraft.
+     * Generally involves things such as the tweakClass/s for Forge.
      */
     private String extraArguments = null;
 
     /**
-     * The arguments required by Minecraft to be added to the command when launching Minecraft. Generally involves thing
-     * such as handling of authentication, assets paths etc.
+     * The arguments required by Minecraft to be added to the command when launching
+     * Minecraft. Generally involves thing such as handling of authentication,
+     * assets paths etc.
      */
     private String minecraftArguments = null;
 
@@ -139,13 +157,19 @@ public class Instance implements Cloneable {
     private boolean isConverted = false;
 
     /**
-     * The data version.
+     * If this instance uses the new format for libraries.
      */
-    private int dataVersion = 1;
+    private boolean usesNewLibraries = false;
 
     /**
-     * The Pack object for the pack this Instance was installed from. This is not stored in the instances instance.json
-     * file as Pack's can be deleted from the system.
+     * The data version.
+     */
+    private int dataVersion = 2;
+
+    /**
+     * The Pack object for the pack this Instance was installed from. This is not
+     * stored in the instances instance.json file as Pack's can be deleted from the
+     * system.
      *
      * @see com.atlauncher.data.Pack
      */
@@ -157,13 +181,14 @@ public class Instance implements Cloneable {
     private boolean isDev;
 
     /**
-     * If this Instance is playable or not. It may become unplayable after a failed update or if files are found
-     * corrupt.
+     * If this Instance is playable or not. It may become unplayable after a failed
+     * update or if files are found corrupt.
      */
     private boolean isPlayable;
 
     /**
-     * If this instance uses the MCLauncher or the LegacyMCLauncher class to load Minecraft.
+     * If this instance uses the MCLauncher or the LegacyMCLauncher class to load
+     * Minecraft.
      *
      * @see com.atlauncher.mclauncher.MCLauncher
      * @see com.atlauncher.mclauncher.LegacyMCLauncher
@@ -178,8 +203,8 @@ public class Instance implements Cloneable {
     private List<DisableableMod> mods;
 
     /**
-     * List of versions of the Pack this instance comes from that the user has said to not be reminded about updating
-     * to.
+     * List of versions of the Pack this instance comes from that the user has said
+     * to not be reminded about updating to.
      */
     private List<String> ignoredUpdates;
 
@@ -189,27 +214,32 @@ public class Instance implements Cloneable {
      * @param name               the name of the Instance
      * @param pack               the name of the Pack this Instance is of
      * @param realPack           the Pack object for the Pack this Instance is of
-     * @param enableUserLock     if this instance is only meant to be used by the original installer
+     * @param enableUserLock     if this instance is only meant to be used by the
+     *                           original installer
      * @param version            the version of the Pack this Instance is of
      * @param minecraftVersion   the Minecraft version this Instance runs off
      * @param versionType        the version type this Instance runs off
-     * @param memory             the minimum RAM/memory as recommended by the pack developer/s
-     * @param permgen            the minimum PermGen/Metaspace as recommended by the pack developer/s
+     * @param memory             the minimum RAM/memory as recommended by the pack
+     *                           developer/s
+     * @param permgen            the minimum PermGen/Metaspace as recommended by the
+     *                           pack developer/s
      * @param mods               the mods installed in this Instance
-     * @param jarOrder           the order that jar mods are loaded into the class path
-     * @param librariesNeeded    the libraries needed to launch Minecraft
+     * @param jarOrder           the order that jar mods are loaded into the class
+     *                           path
+     * @param libraries          the libraries needed to launch Minecraft
      * @param extraArguments     the extra arguments for launching the pack
      * @param minecraftArguments the arguments needed by Minecraft to run
      * @param mainClass          the main class to run when launching Minecraft
      * @param assets             the assets version being used by Minecraft
      * @param isDev              if this Instance is using a dev version of the pack
      * @param isPlayable         if this instance is playable
-     * @param newLaunchMethod    if this instance is using the new launch method for Minecraft
+     * @param newLaunchMethod    if this instance is using the new launch method for
+     *                           Minecraft
      */
-    public Instance(String name, String pack, Pack realPack, boolean enableUserLock, String version, String
-        minecraftVersion, String versionType, int memory, int permgen, List<DisableableMod> mods, String jarOrder,
-                    String librariesNeeded, String extraArguments, String minecraftArguments, String mainClass,
-                    String assets, boolean isDev, boolean isPlayable, boolean newLaunchMethod) {
+    public Instance(String name, String pack, Pack realPack, boolean enableUserLock, String version,
+            String minecraftVersion, String versionType, int memory, int permgen, List<DisableableMod> mods,
+            String jarOrder, List<String> libraries, String extraArguments, String minecraftArguments, String mainClass,
+            String assets, boolean isDev, boolean isPlayable, boolean newLaunchMethod) {
         this.name = name;
         this.pack = pack;
         this.realPack = realPack;
@@ -220,7 +250,7 @@ public class Instance implements Cloneable {
         this.permgen = permgen;
         this.mods = mods;
         this.jarOrder = jarOrder;
-        this.librariesNeeded = librariesNeeded;
+        this.libraries = libraries;
         this.mainClass = mainClass;
         this.assets = assets;
         this.jarOrder = jarOrder;
@@ -235,6 +265,7 @@ public class Instance implements Cloneable {
             this.userLock = null;
         }
         this.isConverted = true;
+        this.usesNewLibraries = true;
     }
 
     /**
@@ -243,28 +274,34 @@ public class Instance implements Cloneable {
      * @param name               the name of the Instance
      * @param pack               the name of the Pack this Instance is of
      * @param realPack           the Pack object for the Pack this Instance is of
-     * @param enableUserLock     if this instance is only meant to be used by the original installer
+     * @param enableUserLock     if this instance is only meant to be used by the
+     *                           original installer
      * @param version            the version of the Pack this Instance is of
      * @param minecraftVersion   the Minecraft version this Instance runs off
      * @param versionType        the version type this Instance runs off
-     * @param memory             the minimum RAM/memory as recommended by the pack developer/s
-     * @param permgen            the minimum PermGen/Metaspace as recommended by the pack developer/s
+     * @param memory             the minimum RAM/memory as recommended by the pack
+     *                           developer/s
+     * @param permgen            the minimum PermGen/Metaspace as recommended by the
+     *                           pack developer/s
      * @param mods               the mods installed in this Instance
-     * @param jarOrder           the order that jar mods are loaded into the class path
-     * @param librariesNeeded    the libraries needed to launch Minecraft
+     * @param jarOrder           the order that jar mods are loaded into the class
+     *                           path
+     * @param libraries          the libraries needed to launch Minecraft
      * @param extraArguments     the extra arguments for launching the pack
      * @param minecraftArguments the arguments needed by Minecraft to run
      * @param mainClass          the main class to run when launching Minecraft
      * @param assets             the assets version being used by Minecraft
      * @param isDev              if this Instance is using a dev version of the pack
-     * @param newLaunchMethod    if this instance is using the new launch method for Minecraft
+     * @param newLaunchMethod    if this instance is using the new launch method for
+     *                           Minecraft
      */
-    public Instance(String name, String pack, Pack realPack, boolean enableUserLock, String version, String
-        minecraftVersion, String versionType, int memory, int permgen, List<DisableableMod> mods, String jarOrder,
-                    String librariesNeeded, String extraArguments, String minecraftArguments, String mainClass,
-                    String assets, boolean isDev, boolean newLaunchMethod) {
-        this(name, pack, realPack, enableUserLock, version, minecraftVersion, versionType, memory, permgen, mods, jarOrder,
-            librariesNeeded, extraArguments, minecraftArguments, mainClass, assets, isDev, true, newLaunchMethod);
+    public Instance(String name, String pack, Pack realPack, boolean enableUserLock, String version,
+            String minecraftVersion, String versionType, int memory, int permgen, List<DisableableMod> mods,
+            String jarOrder, List<String> libraries, String extraArguments, String minecraftArguments, String mainClass,
+            String assets, boolean isDev, boolean newLaunchMethod) {
+        this(name, pack, realPack, enableUserLock, version, minecraftVersion, versionType, memory, permgen, mods,
+                jarOrder, libraries, extraArguments, minecraftArguments, mainClass, assets, isDev, true,
+                newLaunchMethod);
     }
 
     /**
@@ -277,7 +314,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Sets a new name for this Instance. Used primarily when renaming a cloned instance.
+     * Sets a new name for this Instance. Used primarily when renaming a cloned
+     * instance.
      *
      * @param newName the new name for this Instance
      */
@@ -286,7 +324,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets the safe name of the Instance used in file paths. Removes all non alphanumeric characters.
+     * Gets the safe name of the Instance used in file paths. Removes all non
+     * alphanumeric characters.
      *
      * @return the safe name of the Instance.
      */
@@ -295,7 +334,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets the name of the Pack this Instance was created from. Pack's can be deleted/removed in the future.
+     * Gets the name of the Pack this Instance was created from. Pack's can be
+     * deleted/removed in the future.
      *
      * @return the name of the Pack the Instance was created from.
      */
@@ -313,9 +353,11 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets the order to load any jar mods into the class path when launching Minecraft.
+     * Gets the order to load any jar mods into the class path when launching
+     * Minecraft.
      *
-     * @return comma separated list of filenames to jar mods in their correct loading order
+     * @return comma separated list of filenames to jar mods in their correct
+     *         loading order
      */
     public String getJarOrder() {
         return this.jarOrder;
@@ -324,15 +366,17 @@ public class Instance implements Cloneable {
     /**
      * Sets the order to load the jars from the jarmods folder.
      *
-     * @param jarOrder comma separated list of filenames for the order to load the mods from the jarmods folder
+     * @param jarOrder comma separated list of filenames for the order to load the
+     *                 mods from the jarmods folder
      */
     public void setJarOrder(String jarOrder) {
         this.jarOrder = jarOrder;
     }
 
     /**
-     * Gets the minimum recommended RAM/memory for this Instance based off what the Pack specifies. Defaults to 0 if
-     * there is none specified by the pack. Value is in MB.
+     * Gets the minimum recommended RAM/memory for this Instance based off what the
+     * Pack specifies. Defaults to 0 if there is none specified by the pack. Value
+     * is in MB.
      *
      * @return the minimum RAM/memory recommended for this Instance in MB
      */
@@ -350,18 +394,22 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets a List of the installed mods in this Instance. Mods are listed as DisableableMod objects.
+     * Gets a List of the installed mods in this Instance. Mods are listed as
+     * DisableableMod objects.
      *
-     * @return a List of DisableableMod objects of the installed mods in this instance or null if none
+     * @return a List of DisableableMod objects of the installed mods in this
+     *         instance or null if none
      */
     public List<DisableableMod> getInstalledMods() {
         return this.mods;
     }
 
     /**
-     * Gets a List of the selected installed mods in this Instance. Mods are listed as DisableableMod objects.
+     * Gets a List of the selected installed mods in this Instance. Mods are listed
+     * as DisableableMod objects.
      *
-     * @return a List of DisableableMod objects of the selected installed mods in this instance or null if none
+     * @return a List of DisableableMod objects of the selected installed mods in
+     *         this instance or null if none
      */
     public List<DisableableMod> getInstalledSelectedMods() {
         List<DisableableMod> mods = new ArrayList<DisableableMod>();
@@ -376,8 +424,9 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets the minimum recommended PermGen/Metaspace size for this Instance based off what the Pack specifies. Defaults
-     * to 0 if there is non specified by the pack. Value is in MB.
+     * Gets the minimum recommended PermGen/Metaspace size for this Instance based
+     * off what the Pack specifies. Defaults to 0 if there is non specified by the
+     * pack. Value is in MB.
      *
      * @return the minimum PermGen/Metaspace recommended for this Instance in MB
      */
@@ -386,7 +435,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Renames this instance including renaming the folder in the Instances directory to the new name provided.
+     * Renames this instance including renaming the folder in the Instances
+     * directory to the new name provided.
      *
      * @param newName the new name of the Instance
      * @return true if the Instances folder was renamed and false if it failed
@@ -405,8 +455,9 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets the name of the Pack this Instance was created from in a safe manner by removing all non alphanumeric
-     * characters which is then safe for use inside file paths and URL's.
+     * Gets the name of the Pack this Instance was created from in a safe manner by
+     * removing all non alphanumeric characters which is then safe for use inside
+     * file paths and URL's.
      *
      * @return the safe name of the Pack
      */
@@ -415,7 +466,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets a ImageIcon object for the image file of the Pack for use in displaying in the Packs and Instances tabs.
+     * Gets a ImageIcon object for the image file of the Pack for use in displaying
+     * in the Packs and Instances tabs.
      *
      * @return ImageIcon for this Instances Pack
      */
@@ -429,8 +481,8 @@ public class Instance implements Cloneable {
                 Image dimg = img.getScaledInstance(300, 150, Image.SCALE_SMOOTH);
                 return new ImageIcon(dimg);
             } catch (IOException e) {
-                LogManager.logStackTrace("Error creating scaled image from the custom image of instance " + this
-                    .getName(), e);
+                LogManager.logStackTrace(
+                        "Error creating scaled image from the custom image of instance " + this.getName(), e);
             }
         }
 
@@ -443,8 +495,9 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets the description of the Pack this Instance was installed from if it's still available in the Launcher. If the
-     * pack no longer exists then it simply returns "No Description".
+     * Gets the description of the Pack this Instance was installed from if it's
+     * still available in the Launcher. If the pack no longer exists then it simply
+     * returns "No Description".
      *
      * @return the description of the Pack this Instance was created from
      */
@@ -457,7 +510,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Checks if this Instance has been converted or not from the old arguments storage.
+     * Checks if this Instance has been converted or not from the old arguments
+     * storage.
      *
      * @return true if this Instance has already been converted
      */
@@ -466,8 +520,27 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Checks to see if Leaderboards are enabled for the Pack this Instance was created from. If the pack no longer
-     * exists we don't allow logging of Leaderboard statistics.
+     * Sets if this instance uses the new libraries format
+     *
+     * @param usesNewLibraries true if the new libraries format should be used
+     */
+    public void setUsesNewLibraries(boolean usesNewLibraries) {
+        this.usesNewLibraries = usesNewLibraries;
+    }
+
+    /**
+     * Checks if this Instance uses the new libraries format or not.
+     *
+     * @return true if this Instance uses new libraries format
+     */
+    public boolean usesNewLibraries() {
+        return this.usesNewLibraries;
+    }
+
+    /**
+     * Checks to see if Leaderboards are enabled for the Pack this Instance was
+     * created from. If the pack no longer exists we don't allow logging of
+     * Leaderboard statistics.
      *
      * @return true if Leaderboard are enabled and statistics can be sent
      */
@@ -476,8 +549,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Checks to see if Logging is enabled for the Pack this Instance was created from. If the pack no longer exists we
-     * don't allow logging.
+     * Checks to see if Logging is enabled for the Pack this Instance was created
+     * from. If the pack no longer exists we don't allow logging.
      *
      * @return true if Logging is enabled
      */
@@ -486,9 +559,10 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * This stops the popup informing a user that this Instance has an update when they go to play this Instance. It
-     * will simply deny the current version from showing up again informing the user when their Instance is not using
-     * the latest version.
+     * This stops the popup informing a user that this Instance has an update when
+     * they go to play this Instance. It will simply deny the current version from
+     * showing up again informing the user when their Instance is not using the
+     * latest version.
      */
     public void ignoreUpdate() {
         if (this.ignoredUpdates == null) {
@@ -510,7 +584,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Checks to see if a given version has been ignored from showing update prompts when the Instance is played.
+     * Checks to see if a given version has been ignored from showing update prompts
+     * when the Instance is played.
      *
      * @param version the version to check if it's been ignored in the past
      * @return true if the user has chosen to ignore updates for the given version
@@ -528,8 +603,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * This converts an old Instance using old Minecraft argument storage to the new method of storage as well as make
-     * sure we're on the same dataVersion.
+     * This converts an old Instance using old Minecraft argument storage to the new
+     * method of storage as well as make sure we're on the same dataVersion.
      */
     public void convert() {
         if (!this.isConverted) {
@@ -562,11 +637,25 @@ public class Instance implements Cloneable {
             this.dataVersion = 1;
             this.save(false);
         }
+
+        // changes to the way libraries are saved and loaded from disk
+        if (this.dataVersion < 2) {
+            this.libraries = new ArrayList<String>();
+
+            if (this.librariesNeeded != null) {
+                for (String filePath : this.librariesNeeded.split(",")) {
+                    this.libraries.add(filePath);
+                }
+            }
+
+            this.dataVersion = 2;
+            this.save(false);
+        }
     }
 
     /**
-     * This removes a given DisableableMod object and removes it from the list of installed mods as well as deleting the
-     * file.
+     * This removes a given DisableableMod object and removes it from the list of
+     * installed mods as well as deleting the file.
      *
      * @param mod the DisableableMod object for the mod to remove
      */
@@ -600,6 +689,14 @@ public class Instance implements Cloneable {
      */
     public String getMinecraftVersion() {
         return this.minecraftVersion;
+    }
+
+    public MinecraftVersion getActualMinecraftVersion() {
+        try {
+            return App.settings.getMinecraftVersion(this.minecraftVersion);
+        } catch (InvalidMinecraftVersion e) {
+            return null;
+        }
     }
 
     /**
@@ -643,7 +740,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets a File object for the directory where the assets for this version of Minecraft are stored.
+     * Gets a File object for the directory where the assets for this version of
+     * Minecraft are stored.
      *
      * @return File object for the assets directory used by Minecraft
      */
@@ -661,7 +759,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets a File object for the reports directory of this Instance where OpenEye stores it's pending crash reports.
+     * Gets a File object for the reports directory of this Instance where OpenEye
+     * stores it's pending crash reports.
      *
      * @return File object for the reports directory of this Instance
      */
@@ -797,16 +896,19 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets the Pack object that this Instance was created from. If it doesn't exist, this will return null
+     * Gets the Pack object that this Instance was created from. If it doesn't
+     * exist, this will return null
      *
-     * @return Pack object of the Pack this Instance was created from or null if no longer available
+     * @return Pack object of the Pack this Instance was created from or null if no
+     *         longer available
      */
     public Pack getRealPack() {
         return this.realPack;
     }
 
     /**
-     * Sets the Pack object that this Instance was created from. Defaults to null when loaded.
+     * Sets the Pack object that this Instance was created from. Defaults to null
+     * when loaded.
      *
      * @param realPack the Pack object that this Instance was created from
      */
@@ -826,22 +928,24 @@ public class Instance implements Cloneable {
     /**
      * Sets the minimum recommended PermGen/Metaspace size for this Instance in MB.
      *
-     * @param permgen the minimum recommended PermGen/Metaspace for this Instance in MB
+     * @param permgen the minimum recommended PermGen/Metaspace for this Instance in
+     *                MB
      */
     public void setPermgen(int permgen) {
         this.permgen = permgen;
     }
 
     /**
-     * Sets this Instance as playable after it is marked unplayable and has been rectified.
+     * Sets this Instance as playable after it is marked unplayable and has been
+     * rectified.
      */
     public void setPlayable() {
         this.isPlayable = true;
     }
 
     /**
-     * Sets this Instance as unplayable so the user cannot play the Instance. Used when installs go bad or files are
-     * found that corrupts the Instance
+     * Sets this Instance as unplayable so the user cannot play the Instance. Used
+     * when installs go bad or files are found that corrupts the Instance
      */
     public void setUnplayable() {
         this.isPlayable = false;
@@ -870,9 +974,11 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Checks if the version of the Pack this Instance was created from was a dev version.
+     * Checks if the version of the Pack this Instance was created from was a dev
+     * version.
      *
-     * @return true if the version of the Pack used to create this Instance was a dev version
+     * @return true if the version of the Pack used to create this Instance was a
+     *         dev version
      */
     public boolean isDev() {
         return this.isDev;
@@ -890,7 +996,8 @@ public class Instance implements Cloneable {
     /**
      * Sets the launch method used to launch this Instance.
      *
-     * @param newLaunchMethod true if the new launch menthod should be used, false for the legacy launch method
+     * @param newLaunchMethod true if the new launch menthod should be used, false
+     *                        for the legacy launch method
      */
     public void setIsNewLaunchMethod(boolean newLaunchMethod) {
         this.newLaunchMethod = newLaunchMethod;
@@ -908,20 +1015,52 @@ public class Instance implements Cloneable {
     /**
      * Gets the libraries needed to be loaded when launching Minecraft.
      *
-     * @return a comma separated list of filenames for the libraries to be loaded when Minecraft is started
+     * @return a list of paths for the libraries to be loaded when Minecraft is
+     *         started
      */
-    public String getLibrariesNeeded() {
-        return this.librariesNeeded;
+    public List<String> getLibraries() {
+        return this.libraries;
     }
 
     /**
      * Sets the list of libraries needed to be loaded when launching Minecraft.
      *
-     * @param librariesNeeded a comma separated list of filenames for the libraries to be loaded when Minecraft is
-     *                        started
+     * @param libraries a list of paths for the libraries to be loaded when
+     *                  Minecraft is started
      */
-    public void setLibrariesNeeded(String librariesNeeded) {
-        this.librariesNeeded = librariesNeeded;
+    public void setLibraries(List<String> libraries) {
+        this.libraries = libraries;
+    }
+
+    /**
+     * Gets the arguments needed when launching Minecraft.
+     *
+     * @return a list of paths for the arguments to be used when Minecraft is
+     *         started
+     */
+    public List<String> getArguments() {
+        return this.arguments;
+    }
+
+    /**
+     * Sets the list of arguments needed when launching Minecraft.
+     *
+     * @param arguments a list of paths for the arguments to be used when Minecraft
+     *                  is started
+     */
+    public void setArguments(List<String> arguments) {
+        this.arguments = arguments;
+
+        this.minecraftArguments = null;
+    }
+
+    /**
+     * Checks if there are arguments set for this Instance.
+     *
+     * @return true if there are set arguments for this Instance
+     */
+    public boolean hasArguments() {
+        return this.arguments != null;
     }
 
     /**
@@ -934,7 +1073,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets the extra arguments for the Instance which is added to the command argument when launching Minecraft.
+     * Gets the extra arguments for the Instance which is added to the command
+     * argument when launching Minecraft.
      *
      * @return the extra arguments used by the Instance when launching Minecraft
      */
@@ -943,9 +1083,11 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Sets the extra arguments for the Instance which is added to the command argument when launching Minecraft.
+     * Sets the extra arguments for the Instance which is added to the command
+     * argument when launching Minecraft.
      *
-     * @param extraArguments the new extra arguments used by the Instance when launching Minecraft
+     * @param extraArguments the new extra arguments used by the Instance when
+     *                       launching Minecraft
      */
     public void setExtraArguments(String extraArguments) {
         this.extraArguments = extraArguments;
@@ -961,8 +1103,9 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets the Minecraft arguments for the Instance which is added to the command argument when launching Minecraft.
-     * These involve things like asset directories, token input among other things.
+     * Gets the Minecraft arguments for the Instance which is added to the command
+     * argument when launching Minecraft. These involve things like asset
+     * directories, token input among other things.
      *
      * @return the Minecraft arguments used by the Instance when launching Minecraft
      */
@@ -971,10 +1114,12 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Sets the Minecraft arguments for the Instance which is added to the command argument when launching Minecraft.
-     * These involve things like asset directories, token input among other things.
+     * Sets the Minecraft arguments for the Instance which is added to the command
+     * argument when launching Minecraft. These involve things like asset
+     * directories, token input among other things.
      *
-     * @param minecraftArguments the new Minecraft arguments used by the Instance when launching Minecraft
+     * @param minecraftArguments the new Minecraft arguments used by the Instance
+     *                           when launching Minecraft
      */
     public void setMinecraftArguments(String minecraftArguments) {
         this.minecraftArguments = minecraftArguments;
@@ -999,7 +1144,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets the assets value which Minecraft uses to determine how to load assets in the game.
+     * Gets the assets value which Minecraft uses to determine how to load assets in
+     * the game.
      *
      * @return the assets value
      */
@@ -1008,7 +1154,8 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Sets the assets value which Minecraft uses to determine how to load assets in the game.
+     * Sets the assets value which Minecraft uses to determine how to load assets in
+     * the game.
      *
      * @param assets the new assets value
      */
@@ -1017,8 +1164,9 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Checks if this Instance can be played. This refers only to the account and permission side of things and doesn't
-     * reference if the instance is playable or as determined by the {@link com.atlauncher.data.Instance#isPlayable}
+     * Checks if this Instance can be played. This refers only to the account and
+     * permission side of things and doesn't reference if the instance is playable
+     * or as determined by the {@link com.atlauncher.data.Instance#isPlayable}
      * field.
      *
      * @return true if the user can play this Instance
@@ -1029,9 +1177,9 @@ public class Instance implements Cloneable {
             return false;
         }
 
-        // Check to see if this was a private Instance belonging to a specific user only.
-        if (this.userLock != null && !App.settings.getAccount().getUUIDNoDashes().equalsIgnoreCase(this
-            .userLock)) {
+        // Check to see if this was a private Instance belonging to a specific user
+        // only.
+        if (this.userLock != null && !App.settings.getAccount().getUUIDNoDashes().equalsIgnoreCase(this.userLock)) {
             return false;
         }
 
@@ -1067,14 +1215,16 @@ public class Instance implements Cloneable {
     public boolean hasUpdate() {
         // Check to see if there is a Pack object defined first.
         if (this.realPack != null) {
-            // Then check if the Pack has any versions associated with it and were NOT running a dev
+            // Then check if the Pack has any versions associated with it and were NOT
+            // running a dev
             // version, as dev versions should never be updated.
             if (this.realPack.hasVersions() && !isDev()) {
                 // Lastly check if the current version we installed is different than the latest
-                // version of the Pack and that the latest version of the Pack is not restricted to
+                // version of the Pack and that the latest version of the Pack is not restricted
+                // to
                 // disallow updates.
-                if (!this.realPack.getLatestVersion().getVersion().equalsIgnoreCase(this.version) && !this.realPack
-                    .isLatestVersionNoUpdate()) {
+                if (!this.realPack.getLatestVersion().getVersion().equalsIgnoreCase(this.version)
+                        && !this.realPack.isLatestVersionNoUpdate()) {
                     return true;
                 }
             }
@@ -1091,20 +1241,23 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets the latest version of the Pack this Instance was created from. If the Pack has been removed or it has no
-     * published versions then it will return null.
+     * Gets the latest version of the Pack this Instance was created from. If the
+     * Pack has been removed or it has no published versions then it will return
+     * null.
      *
-     * @return the latest version of the Pack this Instance was created from or null if the Pack no longer exists or
-     * there is no versions of the Pack
+     * @return the latest version of the Pack this Instance was created from or null
+     *         if the Pack no longer exists or there is no versions of the Pack
      */
     public String getLatestVersion() {
-        return (this.realPack != null ? (this.realPack.getLatestVersion() == null ? null : this.realPack
-            .getLatestVersion().getVersion()) : null);
+        return (this.realPack != null
+                ? (this.realPack.getLatestVersion() == null ? null : this.realPack.getLatestVersion().getVersion())
+                : null);
     }
 
     public String getLatestDevHash() {
-        return (this.realPack != null ? (this.realPack.getLatestDevVersion() == null ? null : this.realPack
-            .getLatestDevVersion().getHash()) : null);
+        return (this.realPack != null
+                ? (this.realPack.getLatestDevVersion() == null ? null : this.realPack.getLatestDevVersion().getHash())
+                : null);
     }
 
     /**
@@ -1144,7 +1297,8 @@ public class Instance implements Cloneable {
     /**
      * Sets the mods installed for this Instance.
      *
-     * @param mods List of {@link com.atlauncher.data.DisableableMod} objects of the mods installed with this Instance.
+     * @param mods List of {@link com.atlauncher.data.DisableableMod} objects of the
+     *             mods installed with this Instance.
      */
     public void setModsInstalled(List<DisableableMod> mods) {
         this.mods = mods;
@@ -1158,19 +1312,21 @@ public class Instance implements Cloneable {
     public boolean launch() {
         final Account account = App.settings.getAccount();
         if (account == null) {
-            String[] options = {Language.INSTANCE.localize("common.ok")};
+            String[] options = { Language.INSTANCE.localize("common.ok") };
             JOptionPane.showOptionDialog(App.settings.getParent(), Language.INSTANCE.localize("instance.noaccount"),
-                Language.INSTANCE.localize("instance.noaccountselected"), JOptionPane.DEFAULT_OPTION, JOptionPane
-                    .ERROR_MESSAGE, null, options, options[0]);
+                    Language.INSTANCE.localize("instance.noaccountselected"), JOptionPane.DEFAULT_OPTION,
+                    JOptionPane.ERROR_MESSAGE, null, options, options[0]);
             App.settings.setMinecraftLaunched(false);
             return false;
         } else {
             if ((App.settings.getMaximumMemory() < this.memory) && (this.memory <= Utils.getSafeMaximumRam())) {
-                String[] options = {Language.INSTANCE.localize("common.yes"), Language.INSTANCE.localize("common.no")};
-                int ret = JOptionPane.showOptionDialog(App.settings.getParent(), HTMLUtils.centerParagraph(Language
-                        .INSTANCE.localizeWithReplace("instance.insufficientram", "<b>" + this.memory + "</b> " +
-                            "MB<br/><br/>")), Language.INSTANCE.localize("instance.insufficientramtitle"),
-                    JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE, null, options, options[0]);
+                String[] options = { Language.INSTANCE.localize("common.yes"),
+                        Language.INSTANCE.localize("common.no") };
+                int ret = JOptionPane.showOptionDialog(App.settings.getParent(),
+                        HTMLUtils.centerParagraph(Language.INSTANCE.localizeWithReplace("instance.insufficientram",
+                                "<b>" + this.memory + "</b> " + "MB<br/><br/>")),
+                        Language.INSTANCE.localize("instance.insufficientramtitle"), JOptionPane.DEFAULT_OPTION,
+                        JOptionPane.ERROR_MESSAGE, null, options, options[0]);
                 if (ret != 0) {
                     LogManager.warn("Launching of instance cancelled due to user cancelling memory warning!");
                     App.settings.setMinecraftLaunched(false);
@@ -1178,11 +1334,13 @@ public class Instance implements Cloneable {
                 }
             }
             if (App.settings.getPermGen() < this.permgen) {
-                String[] options = {Language.INSTANCE.localize("common.yes"), Language.INSTANCE.localize("common.no")};
-                int ret = JOptionPane.showOptionDialog(App.settings.getParent(), HTMLUtils.centerParagraph(Language
-                        .INSTANCE.localizeWithReplace("instance.insufficientpermgen", "<b>" + this.permgen + "</b> " +
-                            "MB<br/><br/>")), Language.INSTANCE.localize("instance.insufficientpermgentitle"),
-                    JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE, null, options, options[0]);
+                String[] options = { Language.INSTANCE.localize("common.yes"),
+                        Language.INSTANCE.localize("common.no") };
+                int ret = JOptionPane.showOptionDialog(App.settings.getParent(),
+                        HTMLUtils.centerParagraph(Language.INSTANCE.localizeWithReplace("instance.insufficientpermgen",
+                                "<b>" + this.permgen + "</b> " + "MB<br/><br/>")),
+                        Language.INSTANCE.localize("instance.insufficientpermgentitle"), JOptionPane.DEFAULT_OPTION,
+                        JOptionPane.ERROR_MESSAGE, null, options, options[0]);
                 if (ret != 0) {
                     LogManager.warn("Launching of instance cancelled due to user cancelling permgen warning!");
                     App.settings.setMinecraftLaunched(false);
@@ -1190,10 +1348,9 @@ public class Instance implements Cloneable {
                 }
             }
 
-
             LogManager.info("Logging into Minecraft!");
             final ProgressDialog dialog = new ProgressDialog(Language.INSTANCE.localize("account.loggingin"), 0,
-                Language.INSTANCE.localize("account.loggingin"), "Aborted login to Minecraft!");
+                    Language.INSTANCE.localize("account.loggingin"), "Aborted login to Minecraft!");
             dialog.addThread(new Thread() {
                 public void run() {
                     dialog.setReturnValue(account.login());
@@ -1230,15 +1387,10 @@ public class Instance implements Cloneable {
                             }
                         }
 
-                        LogManager.info("Launching pack " + getPackName() + " " + getVersion() + " for " +
-                            "Minecraft " + getMinecraftVersion());
+                        LogManager.info("Launching pack " + getPackName() + " " + getVersion() + " for " + "Minecraft "
+                                + getMinecraftVersion());
 
-                        Process process = null;
-                        if (isNewLaunchMethod()) {
-                            process = MCLauncher.launch(account, Instance.this, session);
-                        } else {
-                            process = LegacyMCLauncher.launch(account, Instance.this, session);
-                        }
+                        Process process = MCLauncher.launch(account, Instance.this, session);
 
                         if (!App.settings.keepLauncherOpen() && !App.settings.enableLogs()) {
                             System.exit(0);
@@ -1299,18 +1451,21 @@ public class Instance implements Cloneable {
                                             if (preWorldList.containsKey(file.getName())) {
                                                 // Only backup if file changed
                                                 if (!(preWorldList.get(file.getName()) == file.lastModified())) {
-                                                    SyncAbstract sync = SyncAbstract.syncList.get(App.settings
-                                                        .getLastSelectedSync());
-                                                    sync.backupWorld(file.getName() + String.valueOf(file
-                                                        .lastModified()), file, Instance.this);
+                                                    SyncAbstract sync = SyncAbstract.syncList
+                                                            .get(App.settings.getLastSelectedSync());
+                                                    sync.backupWorld(
+                                                            file.getName() + String.valueOf(file.lastModified()), file,
+                                                            Instance.this);
                                                 }
                                             }
                                             // Or backup if a new file is found
                                             else {
-                                                SyncAbstract sync = SyncAbstract.syncList.get(App.settings
-                                                    .getLastSelectedSync());
-                                                sync.backupWorld(file.getName() + String.valueOf(file.lastModified())
-                                                    .replace(":", ""), file, Instance.this);
+                                                SyncAbstract sync = SyncAbstract.syncList
+                                                        .get(App.settings.getLastSelectedSync());
+                                                sync.backupWorld(
+                                                        file.getName()
+                                                                + String.valueOf(file.lastModified()).replace(":", ""),
+                                                        file, Instance.this);
                                             }
                                         }
                                     }
@@ -1320,8 +1475,8 @@ public class Instance implements Cloneable {
 
                         App.settings.setMinecraftLaunched(false);
                         if (!App.settings.isInOfflineMode()) {
-                            if (isLeaderboardsEnabled() && isLoggingEnabled() && !isDev() && App.settings.enableLogs
-                                ()) {
+                            if (isLeaderboardsEnabled() && isLoggingEnabled() && !isDev()
+                                    && App.settings.enableLogs()) {
                                 final int timePlayed = (int) (end - start) / 1000;
                                 if (timePlayed > 0) {
                                     App.TASKPOOL.submit(new Runnable() {
@@ -1331,7 +1486,9 @@ public class Instance implements Cloneable {
                                     });
                                 }
                             }
-                            if (App.settings.keepLauncherOpen() && App.settings.hasUpdatedFiles()) {
+                            if (App.settings.keepLauncherOpen() && App.settings.hasUpdatedFiles())
+
+                            {
                                 App.settings.reloadLauncherData();
                             }
                         }
@@ -1368,13 +1525,16 @@ public class Instance implements Cloneable {
                     // OpenEye returned a response to the report, display that to user if needed.
                     LogManager.info("OpenEye: Pending crash report sent! URL: " + response.getURL());
                     if (response.hasNote()) {
-                        String[] options = {Language.INSTANCE.localize("common.opencrashreport"), Language.INSTANCE
-                            .localize("common.ok")};
-                        int ret = JOptionPane.showOptionDialog(App.settings.getParent(), HTMLUtils.centerParagraph
-                                (Language.INSTANCE.localizeWithReplace("instance.openeyereport1", "<br/><br/>") +
-                                    response.getNoteDisplay() + Language.INSTANCE.localize("instance" +
-                                    ".openeyereport2")), Language.INSTANCE.localize("instance.aboutyourcrash"),
-                            JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options, options[1]);
+                        String[] options = { Language.INSTANCE.localize("common.opencrashreport"),
+                                Language.INSTANCE.localize("common.ok") };
+                        int ret = JOptionPane
+                                .showOptionDialog(App.settings.getParent(),
+                                        HTMLUtils.centerParagraph(Language.INSTANCE.localizeWithReplace(
+                                                "instance.openeyereport1", "<br/><br/>") + response.getNoteDisplay()
+                                                + Language.INSTANCE.localize("instance" + ".openeyereport2")),
+                                        Language.INSTANCE.localize("instance.aboutyourcrash"),
+                                        JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options,
+                                        options[1]);
                         if (ret == 0) {
                             Utils.openBrowser(response.getURL());
                         }
@@ -1413,13 +1573,13 @@ public class Instance implements Cloneable {
     public Instance clone() {
         Instance clone;
         if (!this.userLock.equals(null)) {
-            clone = new Instance(name, pack, realPack, true, version, minecraftVersion, versionType,
-                memory, permgen, mods, jarOrder, librariesNeeded, extraArguments, minecraftArguments,
-                mainClass, assets, isDev, isPlayable, newLaunchMethod);
+            clone = new Instance(name, pack, realPack, true, version, minecraftVersion, versionType, memory, permgen,
+                    mods, jarOrder, libraries, extraArguments, minecraftArguments, mainClass, assets, isDev, isPlayable,
+                    newLaunchMethod);
         } else {
-            clone = new Instance(name, pack, realPack, false, version, minecraftVersion, versionType,
-                memory, permgen, mods, jarOrder, librariesNeeded, extraArguments, minecraftArguments,
-                mainClass, assets, isDev, isPlayable, newLaunchMethod);
+            clone = new Instance(name, pack, realPack, false, version, minecraftVersion, versionType, memory, permgen,
+                    mods, jarOrder, libraries, extraArguments, minecraftArguments, mainClass, assets, isDev, isPlayable,
+                    newLaunchMethod);
         }
         return clone;
     }
@@ -1460,8 +1620,8 @@ public class Instance implements Cloneable {
     public void save(boolean showToast) {
         Writer writer;
         try {
-            writer = new FileWriter(new File(new File(App.settings.getInstancesDir(), this.getSafeName()),
-                "instance.json"));
+            writer = new FileWriter(
+                    new File(new File(App.settings.getInstancesDir(), this.getSafeName()), "instance.json"));
         } catch (IOException e) {
             LogManager.logStackTrace("Failed to open instance.json for writing", e);
             return;

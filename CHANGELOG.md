@@ -1,9 +1,7 @@
 # Changelog
 
-## 3.2.3.7
-- Add in Alex default skins for even UUID's
-- Add in version_type to the launch arguments
-- Fix dependsGroup on extraArguments not working correctly
-- Stop showing error dialog when no skin is set by the user and is using default
-## 3.2.3.9
-- Fix issues installing some libraries on OSX
+## 3.2.6.0
+
+- Add featured packs tab
+- Add message to accounts tab with info on what account to use
+- Fix loading Forge loader on older MC versions

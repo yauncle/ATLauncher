@@ -62,11 +62,15 @@ public final class PacksTab extends JPanel implements Tab, RelocalizationListene
     private final JCheckBox privateBox = new JCheckBox(Language.INSTANCE.localize("pack.privatepacksonly"));
     private final JCheckBox searchDescBox = new JCheckBox(Language.INSTANCE.localize("pack.searchdescription"));
     private NilCard nilCard;
+    private boolean isVanilla;
+    private boolean isFeatured;
 
     private List<PackCard> cards = new LinkedList<PackCard>();
 
-    public PacksTab() {
+    public PacksTab(boolean isFeatured, boolean isVanilla) {
         super(new BorderLayout());
+        this.isFeatured = isFeatured;
+        this.isVanilla = isVanilla;
         this.topPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
         this.contentPanel.setLayout(new GridBagLayout());
 
@@ -174,8 +178,9 @@ public final class PacksTab extends JPanel implements Tab, RelocalizationListene
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.BOTH;
 
-        List<Pack> packs = App.settings.sortPacksAlphabetically() ? App.settings.getPacksSortedAlphabetically() : App
-                .settings.getPacksSortedPositionally();
+        List<Pack> packs = App.settings.sortPacksAlphabetically()
+                ? App.settings.getPacksSortedAlphabetically(this.isFeatured, this.isVanilla)
+                : App.settings.getPacksSortedPositionally(this.isFeatured, this.isVanilla);
 
         int count = 0;
         for (Pack pack : packs) {
@@ -209,15 +214,15 @@ public final class PacksTab extends JPanel implements Tab, RelocalizationListene
             pack = card.getPack();
             if (keep) {
                 if (!this.searchField.getText().isEmpty()) {
-                    if (!Pattern.compile(Pattern.quote(this.searchField.getText()), Pattern.CASE_INSENSITIVE).matcher
-                            (pack.getName()).find()) {
+                    if (!Pattern.compile(Pattern.quote(this.searchField.getText()), Pattern.CASE_INSENSITIVE)
+                            .matcher(pack.getName()).find()) {
                         show = false;
                     }
                 }
 
                 if (this.searchDescBox.isSelected()) {
-                    if (Pattern.compile(Pattern.quote(this.searchField.getText()), Pattern.CASE_INSENSITIVE).matcher
-                            (pack.getDescription()).find()) {
+                    if (Pattern.compile(Pattern.quote(this.searchField.getText()), Pattern.CASE_INSENSITIVE)
+                            .matcher(pack.getDescription()).find()) {
                         show = true;
                     }
                 }
@@ -268,7 +273,8 @@ public final class PacksTab extends JPanel implements Tab, RelocalizationListene
 
     @Override
     public String getTitle() {
-        return Language.INSTANCE.localize("tabs.packs");
+        return (this.isFeatured ? "Featured " : "") + (this.isVanilla ? "Vanilla " : "")
+                + Language.INSTANCE.localize("tabs.packs");
     }
 
     @Override
@@ -280,7 +286,7 @@ public final class PacksTab extends JPanel implements Tab, RelocalizationListene
         serversBox.setText(Language.INSTANCE.localize("pack.cancreateserver"));
         privateBox.setText(Language.INSTANCE.localize("pack.privatepacksonly"));
         searchDescBox.setText(Language.INSTANCE.localize("pack.searchdescription"));
-        
+
         if (nilCard != null) {
             nilCard.setMessage(Language.INSTANCE.localizeWithReplace("pack.nodisplay", "\n\n"));
         }

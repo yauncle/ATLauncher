@@ -37,12 +37,12 @@ import java.util.zip.GZIPInputStream;
 
 public class Downloadable {
     private String beforeURL;
-    private String url;
-    private File file;
+    protected String url;
+    protected File file;
     private File oldFile;
     private String hash;
     private int size;
-    private HttpURLConnection connection;
+    protected HttpURLConnection connection;
     private InstanceInstaller instanceInstaller;
     private boolean isATLauncherDownload;
     private File copyTo;
@@ -52,8 +52,8 @@ public class Downloadable {
     private Server server;
     private boolean checkForNewness = false;
 
-    public Downloadable(String url, File file, String hash, int size, InstanceInstaller instanceInstaller, boolean
-            isATLauncherDownload, File copyTo, boolean actuallyCopy) {
+    public Downloadable(String url, File file, String hash, int size, InstanceInstaller instanceInstaller,
+            boolean isATLauncherDownload, File copyTo, boolean actuallyCopy) {
         if (isATLauncherDownload) {
             this.servers = new ArrayList<Server>(App.settings.getServers());
             this.server = this.servers.get(0);
@@ -77,13 +77,13 @@ public class Downloadable {
         this.actuallyCopy = actuallyCopy;
     }
 
-    public Downloadable(String url, File file, String hash, int size, InstanceInstaller instanceInstaller, boolean
-            isATLauncherDownload) {
+    public Downloadable(String url, File file, String hash, int size, InstanceInstaller instanceInstaller,
+            boolean isATLauncherDownload) {
         this(url, file, hash, size, instanceInstaller, isATLauncherDownload, null, false);
     }
 
-    public Downloadable(String url, File file, String hash, InstanceInstaller instanceInstaller, boolean
-            isATLauncherDownload) {
+    public Downloadable(String url, File file, String hash, InstanceInstaller instanceInstaller,
+            boolean isATLauncherDownload) {
         this(url, file, hash, -1, instanceInstaller, isATLauncherDownload, null, false);
     }
 
@@ -93,6 +93,10 @@ public class Downloadable {
 
     public Downloadable(String url, boolean isATLauncherDownload) {
         this(url, null, null, -1, null, isATLauncherDownload, null, false);
+    }
+
+    public Downloadable(String url, File file, InstanceInstaller instanceInstaller) {
+        this(url, file, null, -1, instanceInstaller, false, null, false);
     }
 
     public String getFilename() {
@@ -153,16 +157,19 @@ public class Downloadable {
         if (this.file.exists()) {
             if (this.checkForNewness) {
                 if (this.getConnection() != null && this.getFile().length() == this.getFilesize()) {
+                    this.copyFile();
                     return false;
                 }
             }
 
             if (isMD5()) {
                 if (Utils.getMD5(this.file).equalsIgnoreCase(getHash())) {
+                    this.copyFile();
                     return false;
                 }
             } else {
                 if (Utils.getSHA1(this.file).equalsIgnoreCase(getHash())) {
+                    this.copyFile();
                     return false;
                 }
             }
@@ -172,12 +179,13 @@ public class Downloadable {
     }
 
     public void copyFile() {
-        if (this.copyTo != null && this.actuallyCopy) {
+        if (this.copyTo != null && this.actuallyCopy
+                && !this.copyTo.getAbsolutePath().equalsIgnoreCase(this.file.getAbsolutePath())) {
             if (this.copyTo.exists()) {
                 Utils.delete(this.copyTo);
             }
-            new File(this.copyTo.getAbsolutePath().substring(0, this.copyTo.getAbsolutePath().lastIndexOf(File
-                    .separatorChar))).mkdirs();
+            new File(this.copyTo.getAbsolutePath().substring(0,
+                    this.copyTo.getAbsolutePath().lastIndexOf(File.separatorChar))).mkdirs();
             Utils.copyFile(this.file, this.copyTo, true);
         }
     }
@@ -213,7 +221,17 @@ public class Downloadable {
         }
     }
 
-    private HttpURLConnection getConnection() {
+    protected void setRequestHeaders() {
+        if (App.useGzipForDownloads) {
+            this.connection.setRequestProperty("Accept-Encoding", "gzip");
+        }
+        this.connection.setRequestProperty("User-Agent", App.settings.getUserAgent());
+        this.connection.setRequestProperty("Cache-Control", "no-store,max-age=0,no-cache");
+        this.connection.setRequestProperty("Expires", "0");
+        this.connection.setRequestProperty("Pragma", "no-cache");
+    }
+
+    protected HttpURLConnection getConnection() {
         if (this.instanceInstaller != null) {
             if (this.instanceInstaller.isCancelled()) {
                 return null;
@@ -225,8 +243,7 @@ public class Downloadable {
                 String url = this.url;
                 Integer numberOfRedirects = 0;
 
-                while (numberOfRedirects < 5)
-                {
+                while (numberOfRedirects < 5) {
                     URL resourceUrl = new URL(url);
 
                     if (App.settings.getEnableProxy()) {
@@ -237,35 +254,31 @@ public class Downloadable {
                     this.connection.setInstanceFollowRedirects(true);
                     this.connection.setUseCaches(false);
                     this.connection.setDefaultUseCaches(false);
-                    if (App.useGzipForDownloads) {
-                        this.connection.setRequestProperty("Accept-Encoding", "gzip");
-                    }
-                    this.connection.setRequestProperty("User-Agent", App.settings.getUserAgent());
-                    this.connection.setRequestProperty("Cache-Control", "no-store,max-age=0,no-cache");
-                    this.connection.setRequestProperty("Expires", "0");
-                    this.connection.setRequestProperty("Pragma", "no-cache");
+                    this.setRequestHeaders();
                     this.connection.connect();
 
                     // check for redirections
                     switch (this.connection.getResponseCode()) {
-                        case HttpURLConnection.HTTP_MOVED_PERM:
-                        case HttpURLConnection.HTTP_MOVED_TEMP:
-                        case 307:
-                            String location = this.connection.getHeaderField("Location");
-                            URL base = new URL(url);
-                            URL next = new URL(base, location);  // Deal with relative URLs
-                            url = next.toExternalForm();
-                            numberOfRedirects++;
-                            continue;
+                    case HttpURLConnection.HTTP_MOVED_PERM:
+                    case HttpURLConnection.HTTP_MOVED_TEMP:
+                    case 307:
+                        String location = this.connection.getHeaderField("Location");
+                        URL base = new URL(url);
+                        URL next = new URL(base, location); // Deal with relative URLs
+                        url = next.toExternalForm();
+                        numberOfRedirects++;
+                        continue;
                     }
 
                     break;
                 }
 
-                if (this.connection.getResponseCode() / 100 != 2) {
-                    throw new IOException(this.url + " returned response code " + this.connection.getResponseCode() +
-                            (this.connection.getResponseMessage() != null ? " with message of " + this.connection
-                                    .getResponseMessage() : ""));
+                if (this.connection.getResponseCode() != HttpURLConnection.HTTP_NOT_MODIFIED
+                        && this.connection.getResponseCode() / 100 != 2) {
+                    throw new IOException(this.url + " returned response code " + this.connection.getResponseCode()
+                            + (this.connection.getResponseMessage() != null
+                                    ? " with message of " + this.connection.getResponseMessage()
+                                    : ""));
                 }
 
                 LogManager.debug("Connection opened to " + this.url, 3);
@@ -278,8 +291,8 @@ public class Downloadable {
                         this.connection = null;
                         return getConnection();
                     } else {
-                        LogManager.error("Failed to download " + this.beforeURL + " from all " + Constants.LAUNCHER_NAME + " servers. " +
-                                "Cancelling install!");
+                        LogManager.error("Failed to download " + this.beforeURL + " from all " + Constants.LAUNCHER_NAME
+                                + " servers. " + "Cancelling install!");
                         if (this.instanceInstaller != null) {
                             instanceInstaller.cancel(true);
                         }
@@ -378,6 +391,10 @@ public class Downloadable {
         download(downloadAsLibrary, false);
     }
 
+    public void download() {
+        download(false, false);
+    }
+
     public void download(boolean downloadAsLibrary, boolean force) {
         this.attempts = 0;
         if (this.connection != null) {
@@ -404,8 +421,8 @@ public class Downloadable {
             Utils.delete(this.file);
         }
         // Create the directory structure
-        new File(this.file.getAbsolutePath().substring(0, this.file.getAbsolutePath().lastIndexOf(File.separatorChar)
-        )).mkdirs();
+        new File(this.file.getAbsolutePath().substring(0, this.file.getAbsolutePath().lastIndexOf(File.separatorChar)))
+                .mkdirs();
         if (getHash().equalsIgnoreCase("-")) {
             downloadFile(downloadAsLibrary); // Only download the file once since we have no MD5 to check
         } else {
@@ -441,9 +458,9 @@ public class Downloadable {
             if (!done) {
                 if (this.isATLauncherDownload) {
                     if (getNextServer()) {
-                        LogManager.warn("Error downloading " + this.file.getName() + " from " + this.url + ". " +
-                                "Expected hash of " + getHash() + " but got " + fileHash + " instead. Trying another " +
-                                "server!");
+                        LogManager.warn("Error downloading " + this.file.getName() + " from " + this.url + ". "
+                                + "Expected hash of " + getHash() + " but got " + fileHash + " instead. Trying another "
+                                + "server!");
                         this.url = server.getFileURL(this.beforeURL);
                         if (downloadAsLibrary) {
                             this.instanceInstaller.addTotalDownloadedBytes(this.size);
@@ -451,17 +468,18 @@ public class Downloadable {
                         download(downloadAsLibrary); // Redownload the file
                     } else {
                         Utils.copyFile(this.file, App.settings.getFailedDownloadsDir());
-                        LogManager.error("Failed to download file " + this.file.getName() + " from all " + Constants.LAUNCHER_NAME +
-                                "servers. Copied to FailedDownloads Folder. Cancelling install!");
+                        LogManager.error("Failed to download file " + this.file.getName() + " from all "
+                                + Constants.LAUNCHER_NAME
+                                + "servers. Copied to FailedDownloads Folder. Cancelling install!");
                         if (this.instanceInstaller != null) {
                             instanceInstaller.cancel(true);
                         }
                     }
                 } else {
                     Utils.copyFile(this.file, App.settings.getFailedDownloadsDir());
-                    LogManager.error("Error downloading " + this.file.getName() + " from " + this.url + ". Expected " +
-                            "hash of " + getHash() + " but got " + fileHash + " instead. Copied to FailedDownloads " +
-                            "Folder. Cancelling install!");
+                    LogManager.error("Error downloading " + this.file.getName() + " from " + this.url + ". Expected "
+                            + "hash of " + getHash() + " but got " + fileHash + " instead. Copied to FailedDownloads "
+                            + "Folder. Cancelling install!");
                     if (this.instanceInstaller != null) {
                         instanceInstaller.cancel(true);
                     }
@@ -478,12 +496,7 @@ public class Downloadable {
                     fileHash2 = "0";
                 }
                 if (!fileHash2.equalsIgnoreCase(getHash())) {
-                    if (this.copyTo.exists()) {
-                        Utils.delete(this.copyTo);
-                    }
-                    new File(this.copyTo.getAbsolutePath().substring(0, this.copyTo.getAbsolutePath().lastIndexOf
-                            (File.separatorChar))).mkdirs();
-                    Utils.copyFile(this.file, this.copyTo, true);
+                    this.copyFile();
                 }
             }
             App.settings.clearTriedServers(); // Okay downloaded it so clear the servers used
@@ -493,9 +506,12 @@ public class Downloadable {
             Utils.delete(this.oldFile);
         }
 
+        this.afterDownload();
+
         if (this.connection != null) {
             this.connection.disconnect();
         }
+
     }
 
     public boolean getNextServer() {
@@ -517,5 +533,8 @@ public class Downloadable {
             LogManager.logStackTrace("IOException when getting response code for the url " + this.url, e);
             return -1;
         }
+    }
+
+    protected void afterDownload() {
     }
 }

@@ -33,7 +33,8 @@ public final class LogManager {
     public static boolean showDebug = false;
 
     /**
-     * The level of debug logs to show. 1 being lowest, 2 being meh, 3 being EXTREEEEEEEME
+     * The level of debug logs to show. 1 being lowest, 2 being meh, 3 being
+     * EXTREEEEEEEME
      */
     public static int debugLevel = 0;
 
@@ -77,12 +78,13 @@ public final class LogManager {
         Object[] value = Utils.prepareMessageForMinecraftLog(message);
         queue.offer(new LogEvent((LogType) value[0], (String) value[1], 10));
     }
-    
+
     /**
      * Logs a stack trace to the console window
      *
      * @param t The throwable to show in the console
      */
+
     public static void logStackTrace(Throwable t) {
         t.printStackTrace();
 
@@ -94,12 +96,13 @@ public final class LogManager {
             writer.close();
         }
     }
-    
+
     /**
      * Logs a stack trace to the console window with a custom message before it
      *
-     * @param message   A message regarding the stack trace to show before it providing more insight
-     * @param t The throwable to show in the console
+     * @param message A message regarding the stack trace to show before it
+     *                providing more insight
+     * @param t       The throwable to show in the console
      */
     public static void logStackTrace(String message, Throwable t) {
         error(message);
