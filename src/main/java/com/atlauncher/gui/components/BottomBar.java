@@ -47,12 +47,12 @@ public abstract class BottomBar extends JPanel {
         this.setPreferredSize(new Dimension(0, 50));
         this.add(this.rightSide, BorderLayout.EAST);
         this.setupSocialButtonListeners();
-        /*this.rightSide.add(this.nodeCraftIcon);
+        this.rightSide.add(this.nodeCraftIcon);
         this.rightSide.add(this.discordIcon);
-        this.rightSide.add(this.facebookIcon);*/
+        this.rightSide.add(this.facebookIcon);
         this.rightSide.add(this.githubIcon);
-        /*this.rightSide.add(this.redditIcon);
-        this.rightSide.add(this.twitterIcon);*/
+        this.rightSide.add(this.redditIcon);
+        this.rightSide.add(this.twitterIcon);
     }
 
     private void setupSocialButtonListeners() {
