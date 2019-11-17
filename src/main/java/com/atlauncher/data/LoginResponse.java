@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,13 +18,13 @@
 package com.atlauncher.data;
 
 import com.atlauncher.App;
-import com.mojang.authlib.yggdrasil.YggdrasilUserAuthentication;
+import com.mojang.authlib.UserAuthentication;
 
 public class LoginResponse {
     private boolean offline;
     private boolean hasError;
     private String errorMessage;
-    private YggdrasilUserAuthentication auth;
+    private UserAuthentication auth;
     private String username;
 
     public LoginResponse(String username) {
@@ -52,10 +52,10 @@ public class LoginResponse {
     }
 
     public String getErrorMessage() {
-        return (this.errorMessage == null ? "Unknown Error Occured" : this.errorMessage);
+        return (this.errorMessage == null ? "Unknown Error Occurred" : this.errorMessage);
     }
 
-    public void setAuth(YggdrasilUserAuthentication auth) {
+    public void setAuth(UserAuthentication auth) {
         this.auth = auth;
     }
 
@@ -63,7 +63,7 @@ public class LoginResponse {
         return (this.auth != null);
     }
 
-    public YggdrasilUserAuthentication getAuth() {
+    public UserAuthentication getAuth() {
         return this.auth;
     }
 
@@ -80,8 +80,8 @@ public class LoginResponse {
             this.setErrorMessage("Response from Mojang wasn't valid!");
         } else if (this.auth.getAuthenticatedToken() == null) {
             this.setErrorMessage("No authentication token returned from Mojang!");
-        } else if (auth.getSelectedProfile() == null && (this.auth.getAvailableProfiles() == null || this.auth
-                .getAvailableProfiles().length == 0)) {
+        } else if (auth.getSelectedProfile() == null
+                && (this.auth.getAvailableProfiles() == null || this.auth.getAvailableProfiles().length == 0)) {
             this.setErrorMessage("There are no paid copies of Minecraft associated with this account!");
         } else if (this.auth.getSelectedProfile() == null) {
             this.setErrorMessage("No profile selected!");
@@ -94,7 +94,7 @@ public class LoginResponse {
         Account account = App.settings.getAccountByName(this.username);
 
         if (account != null) {
-            account.saveStore(this.auth.saveForStorage());
+            account.setStore(this.auth.saveForStorage());
         }
     }
 }

@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,13 +17,13 @@
  */
 package com.atlauncher.gui.tabs;
 
-import com.atlauncher.App;
-import com.atlauncher.data.Instance;
-import com.atlauncher.data.Language;
-import com.atlauncher.evnt.listener.RelocalizationListener;
-import com.atlauncher.evnt.manager.RelocalizationManager;
-import com.atlauncher.gui.card.InstanceCard;
-import com.atlauncher.gui.card.NilCard;
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.util.regex.Pattern;
 
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -32,22 +32,23 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.util.regex.Pattern;
 
-/**
- * TODO: Rewrite this for better loading
- */
+import com.atlauncher.App;
+import com.atlauncher.data.Instance;
+import com.atlauncher.evnt.listener.RelocalizationListener;
+import com.atlauncher.evnt.manager.RelocalizationManager;
+import com.atlauncher.gui.card.InstanceCard;
+import com.atlauncher.gui.card.InstanceV2Card;
+import com.atlauncher.gui.card.NilCard;
+import com.atlauncher.gui.dialogs.AddCursePackDialog;
+import com.atlauncher.network.Analytics;
+
+import org.mini2Dx.gettext.GetText;
+
 public class InstancesTab extends JPanel implements Tab, RelocalizationListener {
     private static final long serialVersionUID = -969812552965390610L;
     private JPanel topPanel;
+    private JButton addCurseButton;
     private JButton clearButton;
     private JTextField searchBox;
     private JButton searchButton;
@@ -60,7 +61,7 @@ public class InstancesTab extends JPanel implements Tab, RelocalizationListener 
     private JPanel panel;
     private JScrollPane scrollPane;
     private int currentPosition = 0;
-    
+
     private NilCard nilCard;
 
     public InstancesTab() {
@@ -73,13 +74,17 @@ public class InstancesTab extends JPanel implements Tab, RelocalizationListener 
         topPanel = new JPanel();
         topPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
 
-        clearButton = new JButton(Language.INSTANCE.localize("common.clear"));
-        clearButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                searchBox.setText("");
-                hasUpdate.setSelected(false);
-                reload();
-            }
+        addCurseButton = new JButton(GetText.tr("Add Curse Pack"));
+        addCurseButton.addActionListener(e -> {
+            new AddCursePackDialog();
+        });
+        topPanel.add(addCurseButton);
+
+        clearButton = new JButton(GetText.tr("Clear"));
+        clearButton.addActionListener(e -> {
+            searchBox.setText("");
+            hasUpdate.setSelected(false);
+            reload();
         });
         topPanel.add(clearButton);
 
@@ -90,37 +95,33 @@ public class InstancesTab extends JPanel implements Tab, RelocalizationListener 
         searchBox.addKeyListener(new KeyAdapter() {
             public void keyReleased(KeyEvent e) {
                 if (e.getKeyChar() == KeyEvent.VK_ENTER) {
+                    Analytics.sendEvent(searchBox.getText(), "Search", "Instance");
                     reload();
                 }
             }
         });
         topPanel.add(searchBox);
 
-        searchButton = new JButton(Language.INSTANCE.localize("common.search"));
-        searchButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                reload();
-            }
+        searchButton = new JButton(GetText.tr("Search"));
+        searchButton.addActionListener(e -> {
+            Analytics.sendEvent(searchBox.getText(), "Search", "Instance");
+            reload();
         });
         topPanel.add(searchButton);
 
         hasUpdate = new JCheckBox();
         hasUpdate.setSelected(isUpdate);
-        hasUpdate.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                reload();
-            }
-        });
+        hasUpdate.addActionListener(e -> reload());
         topPanel.add(hasUpdate);
 
-        hasUpdateLabel = new JLabel(Language.INSTANCE.localize("instance.hasupdate"));
+        hasUpdateLabel = new JLabel(GetText.tr("Has Update"));
         topPanel.add(hasUpdateLabel);
 
         add(topPanel, BorderLayout.NORTH);
 
         panel = new JPanel();
-        scrollPane = new JScrollPane(panel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane
-                .HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane = new JScrollPane(panel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
         add(scrollPane, BorderLayout.CENTER);
 
@@ -130,47 +131,66 @@ public class InstancesTab extends JPanel implements Tab, RelocalizationListener 
         gbc.weightx = 1.0;
         gbc.fill = GridBagConstraints.BOTH;
 
-        int count = 0;
-        for (Instance instance : App.settings.getInstancesSorted()) {
-            if (instance.canPlay()) {
-                if (keepFilters) {
-                    boolean showInstance = true;
+        App.settings.getInstancesSorted().stream().filter(Instance::canPlay).forEach(instance -> {
+            if (keepFilters) {
+                boolean showInstance = true;
 
-                    if (searchText != null) {
-                        if (!Pattern.compile(Pattern.quote(searchText), Pattern.CASE_INSENSITIVE).matcher(instance
-                                .getName()).find()) {
-                            showInstance = false;
-                        }
+                if (searchText != null) {
+                    if (!Pattern.compile(Pattern.quote(searchText), Pattern.CASE_INSENSITIVE)
+                            .matcher(instance.getName()).find()) {
+                        showInstance = false;
                     }
+                }
 
-                    if (isUpdate) {
-                        if (!instance.hasUpdate()) {
-                            showInstance = false;
-                        }
+                if (isUpdate) {
+                    if (!instance.hasUpdate()) {
+                        showInstance = false;
                     }
+                }
 
-                    if (showInstance) {
-                        panel.add(new InstanceCard(instance), gbc);
-                        gbc.gridy++;
-                        count++;
-                    }
-                } else {
+                if (showInstance) {
                     panel.add(new InstanceCard(instance), gbc);
                     gbc.gridy++;
-                    count++;
                 }
+            } else {
+                panel.add(new InstanceCard(instance), gbc);
+                gbc.gridy++;
             }
-        }
-        if (count == 0) {
-            nilCard = new NilCard(Language.INSTANCE.localizeWithReplace("instance.nodisplay", "\n\n"));
+        });
+
+        App.settings.getInstancesV2Sorted().stream().forEach(instance -> {
+            if (keepFilters) {
+                boolean showInstance = true;
+
+                if (searchText != null) {
+                    if (!Pattern.compile(Pattern.quote(searchText), Pattern.CASE_INSENSITIVE)
+                            .matcher(instance.launcher.name).find()) {
+                        showInstance = false;
+                    }
+                }
+
+                if (isUpdate) {
+                    if (!instance.hasUpdate()) {
+                        showInstance = false;
+                    }
+                }
+
+                if (showInstance) {
+                    panel.add(new InstanceV2Card(instance), gbc);
+                    gbc.gridy++;
+                }
+            } else {
+                panel.add(new InstanceV2Card(instance), gbc);
+                gbc.gridy++;
+            }
+        });
+
+        if (panel.getComponentCount() == 0) {
+            nilCard = new NilCard(GetText.tr("There are no instances to display.\n\nInstall one from the Packs tab."));
             panel.add(nilCard, gbc);
         }
 
-        SwingUtilities.invokeLater(new Runnable() {
-            public void run() {
-                scrollPane.getVerticalScrollBar().setValue(currentPosition);
-            }
-        });
+        SwingUtilities.invokeLater(() -> scrollPane.getVerticalScrollBar().setValue(currentPosition));
     }
 
     public void reload() {
@@ -189,17 +209,17 @@ public class InstancesTab extends JPanel implements Tab, RelocalizationListener 
 
     @Override
     public String getTitle() {
-        return Language.INSTANCE.localize("tabs.instances");
+        return GetText.tr("Instances");
     }
 
     @Override
     public void onRelocalization() {
-        clearButton.setText(Language.INSTANCE.localize("common.clear"));
-        searchButton.setText(Language.INSTANCE.localize("common.search"));
-        hasUpdateLabel.setText(Language.INSTANCE.localize("instance.hasupdate"));
-        
+        clearButton.setText(GetText.tr("Clear"));
+        searchButton.setText(GetText.tr("Search"));
+        hasUpdateLabel.setText(GetText.tr("Has Update"));
+
         if (nilCard != null) {
-            nilCard.setMessage(Language.INSTANCE.localizeWithReplace("instance.nodisplay", "\n\n"));
+            nilCard.setMessage(GetText.tr("There are no instances to display.\n\nInstall one from the Packs tab."));
         }
     }
 }

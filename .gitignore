@@ -1,22 +1,18 @@
-# Ignore Everything
-/*
-/*/
+# Directories
+.gradle/
+.settings/
+bin/
+build/
+dist/
+target/
+testLauncher/
 
-# Except These
-!/.vscode/launch.json
-!/.github/
-!/src/
-!/macapp/
-!/.editorconfig
-!/.gitignore
-!/CONTRIBUTING.md
-!/CHANGELOG.md
-!/Jenkinsfile
-!/LICENSE
-!/pom.xml
-!/README.md
-!/STYLE.md
-!/TESTING.md
+# Files
+.classpath
+.project
 
 # OS X things
 .DS_Store
+
+# Other things
+java_pid*.hprof

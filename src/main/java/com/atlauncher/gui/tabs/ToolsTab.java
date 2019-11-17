@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,15 +17,19 @@
  */
 package com.atlauncher.gui.tabs;
 
-import com.atlauncher.data.Language;
+import java.awt.BorderLayout;
+import java.awt.GridLayout;
+
+import javax.swing.JPanel;
+
 import com.atlauncher.gui.components.BlankToolPanel;
 import com.atlauncher.gui.components.LogClearerToolPanel;
 import com.atlauncher.gui.components.NetworkCheckerToolPanel;
+import com.atlauncher.gui.components.RelaunchInDebugModePanel;
+import com.atlauncher.gui.components.RuntimeDownloaderToolPanel;
 import com.atlauncher.gui.components.ServerCheckerToolPanel;
 
-import javax.swing.JPanel;
-import java.awt.BorderLayout;
-import java.awt.GridLayout;
+import org.mini2Dx.gettext.GetText;
 
 @SuppressWarnings("serial")
 public class ToolsTab extends JPanel implements Tab {
@@ -41,8 +45,8 @@ public class ToolsTab extends JPanel implements Tab {
         mainPanel.add(new NetworkCheckerToolPanel());
         mainPanel.add(new ServerCheckerToolPanel());
         mainPanel.add(new LogClearerToolPanel());
-        mainPanel.add(new BlankToolPanel());
-        mainPanel.add(new BlankToolPanel());
+        mainPanel.add(new RelaunchInDebugModePanel());
+        mainPanel.add(new RuntimeDownloaderToolPanel());
         mainPanel.add(new BlankToolPanel());
 
         add(mainPanel, BorderLayout.CENTER);
@@ -50,6 +54,6 @@ public class ToolsTab extends JPanel implements Tab {
 
     @Override
     public String getTitle() {
-        return Language.INSTANCE.localize("tabs.tools");
+        return GetText.tr("Tools");
     }
 }

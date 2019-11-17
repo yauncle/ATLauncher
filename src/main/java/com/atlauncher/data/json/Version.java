@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,14 +17,14 @@
  */
 package com.atlauncher.data.json;
 
-import com.atlauncher.LogManager;
-import com.atlauncher.annot.Json;
-
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.atlauncher.LogManager;
+import com.atlauncher.annot.Json;
 
 /**
  * This class contains information about a pack's version. This is a singular
@@ -35,96 +35,111 @@ public class Version {
     /**
      * The version this pack's version is.
      */
-    private String version;
+    public String version;
 
     /**
      * The version of Minecraft this version is for.
      */
-    private String minecraft;
+    public String minecraft;
 
     /**
      * The minimum amount of memory/ram to use when launching this version.
      */
-    private int memory;
+    public int memory;
 
     /**
      * The minimum amount of PermGen/MetaSpace to use when launching this version.
      */
-    private int permGen;
+    public int permGen;
 
     /**
      * If this version has no configs.
      */
-    private boolean noConfigs;
+    public boolean noConfigs;
+
+    /**
+     * If this version allows Curse mod integration.
+     */
+    public boolean enableCurseIntegration = false;
+
+    /**
+     * If this version allows editing mods.
+     */
+    public boolean enableEditingMods = true;
 
     /**
      * If this version should uppercase/lowercase all files.
      */
-    private CaseType caseAllFiles;
+    public CaseType caseAllFiles;
 
     /**
      * The details about the MainClass to use when launching Minecraft.
      */
-    private MainClass mainClass;
+    public MainClass mainClass;
 
     /**
      * Details about any extra arguments this version uses when launching Minecraft,
      * usually including the tweakClass for Forge.
      */
-    private ExtraArguments extraArguments;
+    public ExtraArguments extraArguments;
+
+    /**
+     * The java options for this version (if any).
+     */
+    public Java java;
 
     /**
      * The loader this version uses (if any).
      */
-    private Loader loader;
+    public Loader loader;
 
     /**
      * The deletes which should be made when updating/reinstalling this version.
      */
-    private Deletes deletes;
+    public Deletes deletes;
 
     /**
      * The messages that should be shown to the user upon various different
      * conditions such as a new install or update.
      */
-    private Messages messages;
+    public Messages messages;
 
     /**
      * The warning messages that should be shown to the user when an optional mod is
      * selected.
      */
-    private Map<String, String> warnings;
+    public Map<String, String> warnings;
 
     /**
      * A list of Libraries this version requires.
      */
-    private List<Library> libraries;
+    public List<Library> libraries;
 
     /**
      * A map of the difference colours used in this version for things such as mod
      * display.
      */
-    private Map<String, String> colours;
+    public Map<String, String> colours;
 
     /**
      * A list of mods to be installed with this version.
      */
-    private List<Mod> mods;
+    public List<Mod> mods;
 
     /**
      * A list of actions to perform on this version.
      */
-    private List<Action> actions;
+    public List<Action> actions;
 
     /**
      * Sets the default empty objects which are later overwritten by GSON if they
      * exist. If they don't exist, having these here will ensure no NPE's.
      */
     public Version() {
-        this.libraries = new ArrayList<Library>();
-        this.colours = new HashMap<String, String>();
-        this.mods = new ArrayList<Mod>();
-        this.actions = new ArrayList<Action>();
+        this.libraries = new ArrayList<>();
+        this.colours = new HashMap<>();
+        this.mods = new ArrayList<>();
+        this.actions = new ArrayList<>();
     }
 
     /**
@@ -163,6 +178,14 @@ public class Version {
         return this.noConfigs;
     }
 
+    public boolean hasEnabledCurseIntegration() {
+        return this.enableCurseIntegration;
+    }
+
+    public boolean hasEnabledEditingMods() {
+        return this.enableEditingMods;
+    }
+
     public CaseType getCaseAllFiles() {
         return this.caseAllFiles;
     }
@@ -187,12 +210,20 @@ public class Version {
         return this.extraArguments != null && this.extraArguments.getArguments() != null;
     }
 
+    public Java getJava() {
+        return this.java;
+    }
+
     public Loader getLoader() {
         return this.loader;
     }
 
     public boolean hasLoader() {
         return this.loader != null;
+    }
+
+    public boolean hasDeletes() {
+        return this.deletes != null;
     }
 
     public Deletes getDeletes() {
@@ -220,7 +251,7 @@ public class Version {
     }
 
     public List<Mod> getClientInstallMods() {
-        List<Mod> mods = new ArrayList<Mod>();
+        List<Mod> mods = new ArrayList<>();
         for (Mod mod : this.mods) {
             if (mod.installOnClient()) {
                 mods.add(mod);
@@ -230,7 +261,7 @@ public class Version {
     }
 
     public List<Mod> getServerInstallMods() {
-        List<Mod> mods = new ArrayList<Mod>();
+        List<Mod> mods = new ArrayList<>();
         for (Mod mod : this.mods) {
             if (mod.installOnServer()) {
                 mods.add(mod);

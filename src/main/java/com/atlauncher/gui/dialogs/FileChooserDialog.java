@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,9 +17,14 @@
  */
 package com.atlauncher.gui.dialogs;
 
-import com.atlauncher.App;
-import com.atlauncher.data.Language;
-import com.atlauncher.utils.Utils;
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.io.File;
+import java.util.ArrayList;
 
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -30,17 +35,14 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.filechooser.FileFilter;
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.io.File;
-import java.util.ArrayList;
 
+import com.atlauncher.App;
+import com.atlauncher.FileSystem;
+import com.atlauncher.utils.Utils;
+
+import org.mini2Dx.gettext.GetText;
+
+@SuppressWarnings("serial")
 public class FileChooserDialog extends JDialog {
     private JPanel top;
     private JPanel middle;
@@ -58,8 +60,10 @@ public class FileChooserDialog extends JDialog {
     private JButton bottomButton;
     private JButton selectButton;
 
-    public FileChooserDialog(String title, String labelName, String bottomText, String selectorText, String[]
-            subOptions, String[] options) {
+    private boolean closed = false;
+
+    public FileChooserDialog(String title, String labelName, String bottomText, String selectorText,
+            String[] subOptions, String[] options) {
         super(App.settings.getParent(), title, ModalityType.APPLICATION_MODAL);
         this.fileOptions = options;
         setSize(400, 175);
@@ -92,40 +96,37 @@ public class FileChooserDialog extends JDialog {
 
         gbc.gridx++;
         gbc.anchor = GridBagConstraints.BASELINE_LEADING;
-        selectButton = new JButton(Language.INSTANCE.localize("common.select"));
-        selectButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                JFileChooser fileChooser = new JFileChooser(App.settings.getBaseDir());
-                fileChooser.setMultiSelectionEnabled(true);
-                fileChooser.setFileFilter(new FileFilter() {
-                    @Override
-                    public String getDescription() {
-                        return "Mod Files (.jar; .zip; .litemod)";
+        selectButton = new JButton(GetText.tr("Select"));
+        selectButton.addActionListener(e -> {
+            JFileChooser fileChooser = new JFileChooser(FileSystem.BASE_DIR.toFile());
+            fileChooser.setMultiSelectionEnabled(true);
+            fileChooser.setFileFilter(new FileFilter() {
+                @Override
+                public String getDescription() {
+                    return "Mod Files (.jar; .zip; .litemod)";
+                }
+
+                @Override
+                public boolean accept(File f) {
+                    if (f.isDirectory()) {
+                        return true;
                     }
 
-                    @Override
-                    public boolean accept(File f) {
-                        if (f.isDirectory()) {
+                    for (String ext : fileOptions) {
+                        if (f.getName().endsWith(ext)) {
                             return true;
                         }
-
-                        for (String ext : fileOptions) {
-                            if (f.getName().endsWith(ext)) {
-                                return true;
-                            }
-                        }
-                        return false;
                     }
-                });
-                fileChooser.showOpenDialog(App.settings.getParent());
-                filesChosen = fileChooser.getSelectedFiles();
-                if (filesChosen != null && filesChosen.length >= 1) {
-                    if (filesChosen.length == 1) {
-                        textField.setText(filesChosen[0].getAbsolutePath());
-                    } else {
-                        textField.setText(filesChosen.length + " Files Selected!");
-                    }
+                    return false;
+                }
+            });
+            fileChooser.showOpenDialog(App.settings.getParent());
+            filesChosen = fileChooser.getSelectedFiles();
+            if (filesChosen != null && filesChosen.length >= 1) {
+                if (filesChosen.length == 1) {
+                    textField.setText(filesChosen[0].getAbsolutePath());
+                } else {
+                    textField.setText(filesChosen.length + " Files Selected!");
                 }
             }
         });
@@ -139,7 +140,7 @@ public class FileChooserDialog extends JDialog {
 
         gbc.gridx++;
         gbc.anchor = GridBagConstraints.BASELINE_LEADING;
-        selector = new JComboBox<String>();
+        selector = new JComboBox<>();
         for (String item : subOptions) {
             selector.addItem(item);
         }
@@ -149,11 +150,7 @@ public class FileChooserDialog extends JDialog {
         bottom = new JPanel();
         bottom.setLayout(new FlowLayout());
         bottomButton = new JButton(bottomText);
-        bottomButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                close();
-            }
-        });
+        bottomButton.addActionListener(e -> close());
         bottom.add(bottomButton);
 
         add(top, BorderLayout.NORTH);
@@ -162,6 +159,7 @@ public class FileChooserDialog extends JDialog {
 
         addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent arg0) {
+                closed = true;
                 close();
             }
         });
@@ -174,8 +172,12 @@ public class FileChooserDialog extends JDialog {
         dispose();
     }
 
+    public boolean wasClosed() {
+        return this.closed;
+    }
+
     public ArrayList<File> getChosenFiles() {
-        ArrayList<File> files = new ArrayList<File>();
+        ArrayList<File> files = new ArrayList<>();
         if (this.filesChosen == null) {
             return null;
         }

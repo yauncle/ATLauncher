@@ -1,0 +1,190 @@
+import java.util.stream.Collectors
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'org.mini2Dx:gettext-gradle-plugin:1.1.0'
+    }
+}
+
+plugins {
+    id 'java'
+    id 'application'
+
+    id 'com.github.johnrengelman.shadow' version '5.1.0'
+    id 'edu.sc.seis.macAppBundle' version '2.3.0'
+    id 'edu.sc.seis.launch4j' version '2.4.6'
+    id 'net.minecrell.licenser' version '0.4.1'
+    id "com.github.ben-manes.versions" version "0.21.0"
+}
+
+apply plugin: "org.mini2Dx.gettext"
+
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
+
+group = 'com.atlauncher'
+version = '3.3.2.0'
+
+repositories {
+    mavenCentral()
+    jcenter()
+    maven {
+        url 'https://libraries.minecraft.net'
+    }
+    maven {
+        url 'https://jitpack.io'
+    }
+}
+
+dependencies {
+    implementation 'com.google.code.gson:gson:2.8.5'
+    implementation 'org.tukaani:xz:1.8'
+    implementation 'com.mojang:authlib:1.5.21'
+    implementation 'net.iharder:base64:2.3.9'
+    implementation 'com.github.Vatuu:discord-rpc:1.6.2'
+    implementation 'net.sf.jopt-simple:jopt-simple:5.0.4'
+    implementation 'org.zeroturnaround:zt-zip:1.13'
+    implementation 'com.squareup.okhttp3:okhttp:4.0.1'
+    implementation 'net.mikehardy:google-analytics-java:2.0.8'
+    implementation 'io.sentry:sentry:1.7.24'
+    implementation 'org.mini2Dx:gettext-lib:1.1.0'
+    implementation 'org.apache.logging.log4j:log4j-api:2.12.0'
+    implementation 'org.apache.logging.log4j:log4j-core:2.12.0'
+    implementation 'com.sangupta:murmur:1.0.0'
+    implementation 'org.apache.commons:commons-lang3:3.9'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.5.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.5.0'
+}
+
+application {
+    mainClassName = 'com.atlauncher.App'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+jar {
+    manifest {
+        attributes(
+                'SplashScreen-Image': '/assets/image/SplashScreen.png',
+                'Implementation-Title': project.name,
+                'Implementation-Version': version,
+                'Implementation-Vender': 'ATLauncher',
+                'Main-Class': 'com.atlauncher.App',
+                'Multi-Release': 'true'
+        )
+    }
+}
+
+gettext {
+    translations {
+        srcDir = 'src'
+        include = 'main/java/com/atlauncher/**/*.java'
+        excludes = [
+            'main/java/com/atlauncher/adapter/**/*.java',
+            'main/java/com/atlauncher/annot/**/*.java',
+            'main/java/com/atlauncher/collection/**/*.java',
+            'main/java/com/atlauncher/evnt/**/*.java',
+            'main/java/com/atlauncher/exceptions/**/*.java',
+            'main/java/com/atlauncher/interfaces/**/*.java',
+            'main/java/com/atlauncher/listener/**/*.java',
+            'main/java/com/atlauncher/utils/**/*.java'
+        ]
+        commentFormat = ' #. '
+        outputFilename = 'translations.pot'
+    }
+}
+
+license {
+    header = project.file('LICENSEHEADER')
+    sourceSets = [project.sourceSets.main]
+    include '**/*.java'
+    exclude 'de/zh32/**/*.java'
+    exclude 'io/github/**/*.java'
+    exclude 'net/minecraft/**/*.java'
+    exclude 'com/atlauncher/utils/javafinder/*.java'
+    exclude 'com/atlauncher/gui/layouts/WrapLayout.java'
+    newLine = false
+}
+
+shadowJar {
+    classifier = null
+    minimize {
+        exclude(dependency('org.apache.logging.log4j:.*:.*'))
+    }
+    classifier = ''
+}
+
+macAppBundle {
+    mainClassName = 'com.atlauncher.App'
+    appName = 'ATLauncher'
+    appStyle = 'universalJavaApplicationStub'
+    runtimeConfigurationName = 'shadow'
+    jarTask = 'shadowJar'
+    icon = 'src/main/resources/assets/image/Icon.icns'
+    javaProperties.put('user.dir', '$APP_ROOT/Contents/Java')
+    javaProperties.put('apple.laf.useScreenMenuBar', 'true')
+    javaExtras.put("-Djna.nosys", "true")
+    bundleExtras.put("JVMVersion", project.targetCompatibility.toString() + "+")
+}
+
+copyToResourcesJava {
+    exclude(project.configurations.runtime.toList().stream().map({ f -> f.name }).collect(Collectors.toList()))
+    rename("ATLauncher-${project.version}.jar", "ATLauncher.jar")
+}
+
+launch4j {
+    outfile = "ATLauncher-${project.version}.exe"
+    jreMinVersion = '1.7.111'
+    mainClassName = 'com.atlauncher.App'
+    icon = "${projectDir}/src/main/resources/assets/image/Icon.ico"
+    initialHeapPercent = 5;
+    maxHeapPercent = 100;
+    jvmOptions = [
+        "-Djna.nosys=true"
+    ]
+}
+
+artifacts {
+    archives shadowJar
+    archives file(project.tasks.jar.getArchivePath().getPath().replace('.jar', '.exe').replace('libs', 'launch4j'))
+    archives file(project.tasks.jar.getArchivePath().getPath().replace('.jar', '.zip').replace('libs', 'distributions'))
+}
+
+task copyArtifacts(type: Copy) {
+    dependsOn build
+    from shadowJar
+    from file(project.tasks.jar.getArchivePath().getPath().replace('.jar', '.exe').replace('libs', 'launch4j'))
+    from file(project.tasks.jar.getArchivePath().getPath().replace('.jar', '.zip').replace('libs', 'distributions'))
+    into "${projectDir}/dist"
+}
+
+task createMacApp(type: Zip) {
+    dependsOn createApp, shadowJar
+    from("$buildDir/macApp") {
+        include "${project.name}.app/**"
+        exclude "${project.name}.app/Contents/MacOS"
+    }
+    from("$buildDir/macApp") {
+        include "${project.name}.app/Contents/MacOS/**"
+        fileMode 0777
+    }
+    archiveName = "${project.name}-${project.version}.zip"
+}
+
+copyArtifacts.finalizedBy {
+    println 'ATLauncher has been built. Distribution files are located in the dist directory.'
+}
+
+clean.doFirst {
+    delete "${projectDir}/dist"
+}
+
+build.finalizedBy copyArtifacts
+shadowJar.dependsOn jar
+build.dependsOn createExe, createMacApp

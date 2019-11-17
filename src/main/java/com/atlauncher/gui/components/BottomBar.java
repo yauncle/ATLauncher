@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,23 +17,22 @@
  */
 package com.atlauncher.gui.components;
 
-import com.atlauncher.LogManager;
-import com.atlauncher.utils.Utils;
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JPanel;
-import java.awt.BorderLayout;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+
+import com.atlauncher.LogManager;
+import com.atlauncher.utils.OS;
 
 public abstract class BottomBar extends JPanel {
     private static final long serialVersionUID = -7488195680365431776L;
 
-    protected final JButton nodeCraftIcon = new SMButton("/assets/image/NodeCraftIcon.png", "NodeCraft - Setup a " +
-            "Minecraft server with an ATL modpack in less than 60 seconds");
+    protected final JButton nodeCraftIcon = new SMButton("/assets/image/NodeCraftIcon.png",
+            "Nodecraft - Setup a Minecraft server with an ATLauncher modpack in less than 60 seconds");
     protected final JButton discordIcon = new SMButton("/assets/image/DiscordIcon.png", "Discord");
     protected final JButton facebookIcon = new SMButton("/assets/image/FacebookIcon.png", "Facebook");
     protected final JButton githubIcon = new SMButton("/assets/image/GitHubIcon.png", "GitHub");
@@ -57,41 +56,29 @@ public abstract class BottomBar extends JPanel {
     }
 
     private void setupSocialButtonListeners() {
-        nodeCraftIcon.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                LogManager.info("Opening Up NodeCraft");
-                Utils.openBrowser("https://atl.pw/nodecraft-from-launcher");
-            }
+        nodeCraftIcon.addActionListener(e -> {
+            LogManager.info("Opening Up Nodecraft");
+            OS.openWebBrowser("https://atl.pw/nodecraft-from-launcher");
         });
-        discordIcon.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                LogManager.info("Opening Up ATLauncher Discord");
-                Utils.openBrowser("https://atl.pw/discord");
-            }
+        discordIcon.addActionListener(e -> {
+            LogManager.info("Opening Up ATLauncher Discord");
+            OS.openWebBrowser("https://atl.pw/discord");
         });
-        facebookIcon.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                LogManager.info("Opening Up ATLauncher Facebook Page");
-                Utils.openBrowser("https://atl.pw/facebook");
-            }
+        facebookIcon.addActionListener(e -> {
+            LogManager.info("Opening Up ATLauncher Facebook Page");
+            OS.openWebBrowser("https://atl.pw/facebook");
         });
-        githubIcon.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                LogManager.info("Opening Up ATLauncher GitHub Page");
-                Utils.openBrowser("https://atl.pw/github-launcher-3");
-            }
+        githubIcon.addActionListener(e -> {
+            LogManager.info("Opening Up ATLauncher GitHub Page");
+            OS.openWebBrowser("https://atl.pw/github-launcher-3");
         });
-        redditIcon.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                LogManager.info("Opening Up ATLauncher Reddit Page");
-                Utils.openBrowser("https://atl.pw/reddit");
-            }
+        redditIcon.addActionListener(e -> {
+            LogManager.info("Opening Up ATLauncher Reddit Page");
+            OS.openWebBrowser("https://atl.pw/reddit");
         });
-        twitterIcon.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                LogManager.info("Opening Up ATLauncher Twitter Page");
-                Utils.openBrowser("https://atl.pw/twitter");
-            }
+        twitterIcon.addActionListener(e -> {
+            LogManager.info("Opening Up ATLauncher Twitter Page");
+            OS.openWebBrowser("https://atl.pw/twitter");
         });
     }
 }

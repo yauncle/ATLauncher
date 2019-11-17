@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,31 +17,32 @@
  */
 package com.atlauncher.gui;
 
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+
+import javax.swing.JFrame;
+import javax.swing.JMenuItem;
+import javax.swing.JPopupMenu;
+import javax.swing.JScrollPane;
+
 import com.atlauncher.App;
 import com.atlauncher.LogManager;
 import com.atlauncher.data.Constants;
-import com.atlauncher.data.Language;
 import com.atlauncher.evnt.listener.RelocalizationListener;
 import com.atlauncher.evnt.manager.ConsoleCloseManager;
 import com.atlauncher.evnt.manager.ConsoleOpenManager;
 import com.atlauncher.evnt.manager.RelocalizationManager;
 import com.atlauncher.gui.components.Console;
 import com.atlauncher.gui.components.ConsoleBottomBar;
+import com.atlauncher.gui.theme.Theme;
 import com.atlauncher.utils.Utils;
 
-import javax.swing.JFrame;
-import javax.swing.JMenuItem;
-import javax.swing.JPopupMenu;
-import javax.swing.JScrollPane;
-import java.awt.BorderLayout;
-import java.awt.Dimension;
-import java.awt.Toolkit;
-import java.awt.datatransfer.Clipboard;
-import java.awt.datatransfer.StringSelection;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import org.mini2Dx.gettext.GetText;
 
 public class LauncherConsole extends JFrame implements RelocalizationListener {
 
@@ -61,16 +62,16 @@ public class LauncherConsole extends JFrame implements RelocalizationListener {
         this.setLayout(new BorderLayout());
 
         console = new Console();
-        console.setFont(App.THEME.getConsoleFont().deriveFont(Utils.getBaseFontSize()));
-        console.setForeground(App.THEME.getConsoleTextColor());
-        console.setSelectionColor(App.THEME.getSelectionColor());
+        console.setFont(Theme.DEFAULT_THEME.getConsoleFont().deriveFont(Utils.getBaseFontSize()));
+        console.setForeground(Theme.DEFAULT_THEME.getConsoleTextColor());
+        console.setSelectionColor(Theme.DEFAULT_THEME.getSelectionColor());
 
         setupContextMenu(); // Setup the right click menu
 
         bottomBar = new ConsoleBottomBar();
 
-        scrollPane = new JScrollPane(console, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane
-                .HORIZONTAL_SCROLLBAR_NEVER);
+        scrollPane = new JScrollPane(console, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         add(scrollPane, BorderLayout.CENTER);
         add(bottomBar, BorderLayout.SOUTH);
         RelocalizationManager.addListener(this);
@@ -89,13 +90,11 @@ public class LauncherConsole extends JFrame implements RelocalizationListener {
     private void setupContextMenu() {
         contextMenu = new JPopupMenu();
 
-        copy = new JMenuItem("Copy");
-        copy.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                StringSelection text = new StringSelection(console.getSelectedText());
-                Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
-                clipboard.setContents(text, null);
-            }
+        copy = new JMenuItem(GetText.tr("Copy"));
+        copy.addActionListener(e -> {
+            StringSelection text = new StringSelection(console.getSelectedText());
+            Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
+            clipboard.setContents(text, null);
         });
         contextMenu.add(copy);
 
@@ -108,6 +107,12 @@ public class LauncherConsole extends JFrame implements RelocalizationListener {
                 }
             }
         });
+    }
+
+    public void setupTheme() {
+        console.setFont(App.THEME.getConsoleFont().deriveFont(Utils.getBaseFontSize()));
+        console.setForeground(App.THEME.getConsoleTextColor());
+        console.setSelectionColor(App.THEME.getSelectionColor());
     }
 
     /**
@@ -129,7 +134,7 @@ public class LauncherConsole extends JFrame implements RelocalizationListener {
 
     public void setupLanguage() {
         LogManager.debug("Setting up language for console");
-        copy.setText(Language.INSTANCE.localize("common.copy"));
+        copy.setText(GetText.tr("Copy"));
         bottomBar.setupLanguage();
         LogManager.debug("Finished setting up language for console");
     }
@@ -140,7 +145,7 @@ public class LauncherConsole extends JFrame implements RelocalizationListener {
 
     @Override
     public void onRelocalization() {
-        copy.setText(Language.INSTANCE.localize("common.copy"));
+        copy.setText(GetText.tr("Copy"));
         bottomBar.setupLanguage();
     }
 }

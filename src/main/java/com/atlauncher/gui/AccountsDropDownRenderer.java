@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,14 +17,15 @@
  */
 package com.atlauncher.gui;
 
-import com.atlauncher.data.Account;
+import java.awt.Component;
+import java.awt.Dimension;
 
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.ListCellRenderer;
-import java.awt.Component;
-import java.awt.Dimension;
+
+import com.atlauncher.data.Account;
 
 @SuppressWarnings("serial")
 public class AccountsDropDownRenderer extends JLabel implements ListCellRenderer<Account> {

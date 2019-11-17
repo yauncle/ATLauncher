@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,16 +15,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package com.atlauncher.writer;
-
-import com.atlauncher.evnt.LogEvent;
-import com.atlauncher.exceptions.ChunkyException;
 
 import java.io.Closeable;
 import java.io.Flushable;
 import java.io.IOException;
 import java.io.Writer;
+
+import com.atlauncher.evnt.LogEvent;
+import com.atlauncher.exceptions.ChunkyException;
 
 public final class LogEventWriter implements Closeable, Flushable {
     private final Writer writer;

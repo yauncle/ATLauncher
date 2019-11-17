@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,18 +17,19 @@
  */
 package com.atlauncher.gui.tabs.settings;
 
-import com.atlauncher.App;
-import com.atlauncher.gui.CustomLineBorder;
-import com.atlauncher.gui.tabs.Tab;
-import com.atlauncher.utils.Utils;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JPanel;
 import javax.swing.border.Border;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
+
+import com.atlauncher.App;
+import com.atlauncher.gui.CustomLineBorder;
+import com.atlauncher.gui.tabs.Tab;
+import com.atlauncher.utils.Utils;
 
 @SuppressWarnings("serial")
 public abstract class AbstractSettingsTab extends JPanel implements Tab {

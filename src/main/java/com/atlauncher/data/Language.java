@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,104 +15,65 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package com.atlauncher.data;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FilenameFilter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.Properties;
 
 import com.atlauncher.App;
 import com.atlauncher.LogManager;
+import com.atlauncher.evnt.manager.RelocalizationManager;
 
-public enum Language {
-    INSTANCE, Language;
+import org.mini2Dx.gettext.GetText;
+import org.mini2Dx.gettext.PoFile;
 
-    private final Map<String, Properties> langs = new HashMap<String, Properties>();
-    private volatile String current;
+public class Language {
+    public final static List<Locale> locales = new ArrayList<>();
+    public final static Map<String, Locale> languages = new HashMap<>();
+    public static String selected = Locale.ENGLISH.getDisplayName();
 
-    private Language() {
-        try {
-            this.load("English");
-        } catch (IOException ex) {
-            LogManager.logStackTrace("Failed to load language", ex);
-        }
+    // add in the languages we have support for
+    static {
+        locales.add(Locale.ENGLISH);
     }
 
-    public static String[] available() {
-        File[] files = App.settings.getLanguagesDir().listFiles(new FilenameFilter() {
-            @Override
-            public boolean accept(File dir, String name) {
-                return name.endsWith(".lang");
+    public static void init() throws IOException {
+        for (Locale locale : locales) {
+            if (App.class.getResourceAsStream("/assets/lang/" + locale.toString() + ".po") != null) {
+                languages.put(locale.getDisplayName(), locale);
+                GetText.add(
+                        new PoFile(locale, App.class.getResourceAsStream("/assets/lang/" + locale.toString() + ".po")));
+                LogManager.debug("Loaded language " + locale.getDisplayName() + " with key of " + locale);
             }
-        });
-        String[] langs = new String[files.length];
-        for (int i = 0; i < files.length; i++) {
-            langs[i] = files[i].getName().substring(0, 1).toUpperCase() + files[i].getName().substring(1, files[i]
-                    .getName().lastIndexOf("."));
         }
-        return langs;
     }
 
-    public static synchronized String current() {
-        return INSTANCE.current;
-    }
-
-    public synchronized void load(String lang) throws IOException {
-        if (!this.langs.containsKey(lang)) {
-            Properties props = new Properties();
-            File langFile = new File(App.settings.getLanguagesDir(), lang.toLowerCase() + ".lang");
-            if (!langFile.exists()) {
-                LogManager.error("Language file " + langFile.getName() + " doesn't exist! Defaulting it inbuilt one!");
-                props.load(App.class.getResourceAsStream("/assets/lang/english.lang"));
-            } else {
-                props.load(new FileInputStream(langFile));
-            }
-            this.langs.put(lang, props);
-            LogManager.info("Loading Language: " + lang);
+    public static void setLanguage(String language) {
+        if (selected.equals(language)) {
+            return;
         }
 
-        this.current = lang;
-    }
+        Locale locale;
 
-    public synchronized void reload(String lang) throws IOException {
-        if (this.langs.containsKey(lang)) {
-            this.langs.remove(lang);
-        }
-
-        this.load(lang);
-    }
-
-    public synchronized String localize(String lang, String tag) {
-        if (this.langs.containsKey(lang)) {
-            Properties props = this.langs.get(lang);
-            if (props.containsKey(tag)) {
-                return props.getProperty(tag, tag);
-            } else {
-                if (lang.equalsIgnoreCase("English")) {
-                    return "Unknown language key " + tag;
-                } else {
-                    return this.localize("English", tag);
-                }
-            }
+        if (isLanguageByName(language)) {
+            LogManager.info("Language set to " + language);
+            locale = languages.get(language);
+            selected = language;
         } else {
-            return this.localize("English", tag);
+            LogManager.info("Unknown language " + language + ". Defaulting to " + Locale.ENGLISH.getDisplayName());
+            locale = Locale.ENGLISH;
+            selected = Locale.ENGLISH.getDisplayName();
         }
+
+        GetText.setLocale(locale);
+        RelocalizationManager.post();
     }
 
-    public synchronized String localize(String tag) {
-        return this.localize(this.current, tag);
-    }
-
-    public synchronized String localizeWithReplace(String tag, String replaceWith) {
-        return this.localize(this.current, tag).replace("%s", replaceWith);
-    }
-
-    public synchronized String getCurrent() {
-        return this.current;
+    public static boolean isLanguageByName(String language) {
+        return languages.containsKey(language);
     }
 }

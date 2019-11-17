@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,8 +33,10 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Enumeration;
-import java.util.Locale;
 import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -42,26 +44,35 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import javax.swing.InputMap;
-import javax.swing.JOptionPane;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.ToolTipManager;
 import javax.swing.UIManager;
 import javax.swing.text.DefaultEditorKit;
 
+import com.atlauncher.builders.HTMLBuilder;
 import com.atlauncher.data.Constants;
 import com.atlauncher.data.Instance;
+import com.atlauncher.data.Language;
 import com.atlauncher.data.Pack;
 import com.atlauncher.data.Settings;
+import com.atlauncher.gui.LauncherConsole;
 import com.atlauncher.gui.LauncherFrame;
 import com.atlauncher.gui.SplashScreen;
 import com.atlauncher.gui.TrayMenu;
 import com.atlauncher.gui.dialogs.SetupDialog;
 import com.atlauncher.gui.theme.Theme;
-import com.atlauncher.utils.HTMLUtils;
+import com.atlauncher.managers.DialogManager;
+import com.atlauncher.network.ErrorReporting;
+import com.atlauncher.utils.Java;
+import com.atlauncher.utils.OS;
 import com.atlauncher.utils.Utils;
 
 import io.github.asyncronous.toast.Toaster;
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
+import net.arikia.dev.drpc.DiscordEventHandlers;
+import net.arikia.dev.drpc.DiscordRPC;
 
 /**
  * Main entry point for the application, Java runs the main method here when the
@@ -84,6 +95,8 @@ public class App {
      */
     public static TrayMenu TRAY_MENU = new TrayMenu();
 
+    public static LauncherConsole console;
+
     /**
      * If the launcher was just updated and this is it's first time loading after
      * the update. This is used to check for when there are possible issues in which
@@ -91,14 +104,7 @@ public class App {
      */
     public static boolean wasUpdated = false;
 
-    /**
-     * This controls if GZIP is used when downloading files through the launcher.
-     * It's used as a debugging tool and is enabled with the command line argument
-     * shown below.
-     * <p/>
-     * --usegzip=false
-     */
-    public static boolean useGzipForDownloads = true;
+    public static boolean discordInitialized = false;
 
     /**
      * This allows skipping the system tray integration so that the launcher doesn't
@@ -108,6 +114,14 @@ public class App {
      * --skip-tray-integration
      */
     public static boolean skipTrayIntegration = false;
+
+    /**
+     * This allows skipping the in built error reporting. This is mainly useful for
+     * development when you don't want to report errors to an external third party.
+     * <p/>
+     * --disable-error-reporting
+     */
+    public static boolean disableErrorReporting = false;
 
     /**
      * This removes writing the launchers location to AppData/Application Support.
@@ -126,20 +140,12 @@ public class App {
     public static boolean skipHashChecking = false;
 
     /**
-     * This forces the launcher to start in offline mode. It can be enabled with the
-     * below command line argument.
-     * <p/>
-     * --force-offline-mode
-     */
-    public static boolean forceOfflineMode = false;
-
-    /**
      * This forces the working directory for the launcher. It can be changed with
      * the below command line argument.
      * <p/>
      * --working-dir=C:/Games/ATLauncher
      */
-    public static File workingDir = null;
+    public static Path workingDir = null;
 
     /**
      * This forces the launcher to not check for a launcher update. It can be
@@ -187,9 +193,10 @@ public class App {
     public static Theme THEME = Theme.DEFAULT_THEME;
 
     static {
-        /**
-         * Sets up where all uncaught exceptions go to.
-         */
+        // Prefer to use IPv4
+        System.setProperty("java.net.preferIPv4Stack", "true");
+
+        // Sets up where all uncaught exceptions go to.
         Thread.setDefaultUncaughtExceptionHandler(new ExceptionStrainer());
     }
 
@@ -199,94 +206,20 @@ public class App {
      * @param args all the arguments passed in from the command line
      */
     public static void main(String[] args) {
-        // Set English as the default locale. CodeChickenLib(?) has some issues when not
-        // using this on some systems.
-        Locale.setDefault(Locale.ENGLISH);
+        // Parse all the command line arguments
+        parseCommandLineArguments(args);
 
-        // Prefer to use IPv4
-        System.setProperty("java.net.preferIPv4Stack", "true");
+        // Initialize the error reporting
+        ErrorReporting.init(disableErrorReporting);
 
-        if (args != null) {
-            for (String arg : args) {
-                String[] parts = arg.split("=");
-                if (parts[0].equalsIgnoreCase("--launch")) {
-                    autoLaunch = parts[1];
-                } else if (parts[0].equalsIgnoreCase("--updated")) {
-                    wasUpdated = true;
-                } else if (parts[0].equalsIgnoreCase("--debug")) {
-                    LogManager.showDebug = true;
-                    LogManager.debugLevel = 1;
-                    LogManager.debug("Debug logging is enabled! Please note that this will remove any censoring of "
-                            + "user data!");
-                } else if (parts[0].equalsIgnoreCase("--debug-level") && parts.length == 2) {
-                    int debugLevel;
+        // check the launcher has been 'installed' correctly
+        checkInstalledCorrectly();
 
-                    try {
-                        debugLevel = Integer.parseInt(parts[1]);
-                    } catch (NumberFormatException e) {
-                        LogManager.error("Error converting given debug level string to an integer. The specified "
-                                + "debug level given was '" + parts[1] + "'");
-                        continue;
-                    }
-
-                    if (debugLevel < 1 || debugLevel > 3) {
-                        LogManager.error("Invalid debug level of '" + parts[1] + "' given!");
-                        continue;
-                    }
-
-                    LogManager.debugLevel = debugLevel;
-                    LogManager.debug("Debug level has been set to " + debugLevel + "!");
-                } else if (parts[0].equalsIgnoreCase("--usegzip") && parts[1].equalsIgnoreCase("false")) {
-                    useGzipForDownloads = false;
-                    LogManager.debug(
-                            "GZip has been turned off for downloads! Don't ask for support with this " + "disabled!",
-                            true);
-                } else if (parts[0].equalsIgnoreCase("--skip-tray-integration")) {
-                    skipTrayIntegration = true;
-                    LogManager.debug("Skipping tray integration!", true);
-                } else if (parts[0].equalsIgnoreCase("--skip-integration")) {
-                    skipIntegration = true;
-                    LogManager.debug("Skipping integration!", true);
-                } else if (parts[0].equalsIgnoreCase("--skip-hash-checking")) {
-                    skipHashChecking = true;
-                    LogManager.debug("Skipping hash checking! Don't ask for support with this enabled!", true);
-                } else if (parts[0].equalsIgnoreCase("--force-offline-mode")) {
-                    forceOfflineMode = true;
-                    LogManager.debug("Forcing offline mode!", true);
-                } else if (parts[0].equalsIgnoreCase("--no-launcher-update")) {
-                    noLauncherUpdate = true;
-                    LogManager.debug("Not checking for launcher updates! Don't ask for support with this enabled",
-                            true);
-                } else if (parts[0].equalsIgnoreCase("--working-dir")) {
-                    File wDir = new File(parts[1]);
-                    if (wDir.exists() && !wDir.isDirectory()) {
-                        LogManager.error("Working directory not set as it references a file!");
-                    }
-
-                    if (!wDir.exists()) {
-                        wDir.mkdirs();
-                    }
-
-                    workingDir = wDir;
-                }
-            }
-        }
-
-        File config = new File(Utils.getCoreGracefully(), "Configs");
-        if (!config.exists()) {
-            int files = config.getParentFile().list().length;
-            if (files > 1) {
-                String[] options = { "Yes It's Fine", "Whoops. I'll Change That Now" };
-                int ret = JOptionPane.showOptionDialog(null,
-                        HTMLUtils.centerParagraph("I've detected that you may "
-                                + "not have installed this in the right location.<br/><br/>The exe or jar file should "
-                                + "be placed in it's own folder with nothing else in it.<br/><br/>Are you 100% sure "
-                                + "that's what you've done?"),
-                        "Warning", JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE, null, options, options[0]);
-                if (ret != 0) {
-                    System.exit(0);
-                }
-            }
+        try {
+            LogManager.info("Organising filesystem");
+            FileSystem.organise();
+        } catch (IOException e) {
+            LogManager.logStackTrace("Error organising filesystem", e, false);
         }
 
         // Setup the Settings and wait for it to finish.
@@ -295,24 +228,36 @@ public class App {
         final SplashScreen ss = new SplashScreen();
 
         // Load and show the splash screen while we load other things.
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                ss.setVisible(true);
-            }
-        });
+        SwingUtilities.invokeLater(() -> ss.setVisible(true));
 
         // Load the theme and style everything.
         loadTheme();
 
-        // Load the console, making sure it's after the theme and L&F has been loaded
-        // otherwise bad results may occur.
-        settings.loadConsole();
+        console = new LauncherConsole();
+        LogManager.start();
+
+        if (settings.enableConsole()) {
+            // Show the console if enabled.
+            console.setVisible(true);
+        }
+
+        try {
+            Language.init();
+        } catch (IOException e1) {
+            LogManager.logStackTrace("Error loading language", e1);
+        }
+
+        if (settings.enableConsole()) {
+            // Show the console if enabled.
+            SwingUtilities.invokeLater(() -> {
+                console.setVisible(true);
+            });
+        }
 
         if (settings.enableTrayIcon() && !skipTrayIntegration) {
             try {
                 // Try to enable the tray icon.
-                trySystemTrayIntegration();
+                App.trySystemTrayIntegration();
             } catch (Exception e) {
                 LogManager.logStackTrace(e);
             }
@@ -322,11 +267,13 @@ public class App {
 
         LogManager.info("Operating System: " + System.getProperty("os.name"));
 
+        settings.loadJavaPathProperties();
+
         if (settings.isUsingCustomJavaPath()) {
             LogManager.warn("Custom Java Path Set!");
 
             settings.checkForValidJavaPath(false);
-        } else if (settings.isUsingMacApp()) {
+        } else if (OS.isUsingMacApp()) {
             // If the user is using the Mac Application, then we forcibly set the java path
             // if they have none set.
 
@@ -337,30 +284,24 @@ public class App {
             }
         }
 
-        LogManager.info("Java Version: " + Utils.getActualJavaVersion());
+        LogManager.info("Java Version: " + Java.getActualJavaVersion());
+
+        SwingUtilities.invokeLater(() -> Java.getInstalledJavas().stream()
+                .forEach(version -> LogManager.debug(Gsons.DEFAULT.toJson(version))));
 
         LogManager.info("Java Path: " + settings.getJavaPath());
 
-        LogManager.info("64 Bit Java: " + Utils.is64Bit());
+        LogManager.info("64 Bit Java: " + OS.is64Bit());
 
-        if (Utils.isSystemJavaNewerThanJava8()) {
-            LogManager.warn(
-                    "You're using a newer version of Java than Java 8! ATLauncher is only compatable with Java 8");
-            String[] options = { "Close" };
-            JOptionPane.showOptionDialog(null, HTMLUtils.centerParagraph(
-                    "You're using a newer version of Java than Java 8! ATLauncher is only compatable with Java 8. Please uninstall Java and install Java 8"),
-                    "Error", JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE, null, options, options[0]);
-            System.exit(0);
-        }
+        int maxRam = OS.getMaximumRam();
+        LogManager.info("RAM Available: " + (maxRam == 0 ? "Unknown" : maxRam + "MB"));
 
-        LogManager.info("RAM Available: " + Utils.getMaximumRam() + "MB");
-
-        LogManager.info("Launcher Directory: " + settings.getBaseDir());
+        LogManager.info("Launcher Directory: " + FileSystem.BASE_DIR);
         LogManager.info("Using Theme: " + THEME);
 
         // Now for some Mac specific stuff, mainly just setting the name of the
         // application and icon.
-        if (Utils.isMac()) {
+        if (OS.isMac()) {
             System.setProperty("apple.laf.useScreenMenuBar", "true");
             System.setProperty("com.apple.mrj.application.apple.menu.about.name",
                     Constants.LAUNCHER_NAME + " " + Constants.VERSION);
@@ -375,10 +316,8 @@ public class App {
             }
         }
 
-        if (settings.enableConsole()) {
-            // Show the console if enabled.
-            settings.getConsole().setVisible(true);
-        }
+        // Check to make sure the user can load the launcher
+        settings.checkIfWeCanLoad();
 
         LogManager.info("Showing splash screen and loading everything");
         settings.loadEverything(); // Loads everything that needs to be loaded
@@ -397,17 +336,27 @@ public class App {
             if (instance.launch()) {
                 open = false;
             } else {
-                LogManager.error("Error Opening Instance  " + instance.getName());
+                LogManager.error("Error Opening Instance " + instance.getName());
             }
         }
 
-        TRAY_MENU.localize();
+        if (settings.enableDiscordIntegration()) {
+            try {
+                DiscordEventHandlers handlers = new DiscordEventHandlers.Builder().build();
+                DiscordRPC.discordInitialize(Constants.DISCORD_CLIENT_ID, handlers, true);
+                DiscordRPC.discordRegister(Constants.DISCORD_CLIENT_ID, "");
+
+                discordInitialized = true;
+
+                Runtime.getRuntime().addShutdownHook(new Thread(DiscordRPC::discordShutdown));
+            } catch (Exception e) {
+                LogManager.logStackTrace("Failed to initialize Discord integration", e);
+            }
+        }
 
         if (!skipIntegration) {
             integrate();
         }
-
-        ss.close();
 
         if (packCodeToAdd != null) {
             if (settings.addPack(packCodeToAdd)) {
@@ -422,7 +371,57 @@ public class App {
             }
         }
 
-        new LauncherFrame(open); // Open the Launcher
+        // Open the Launcher
+        final boolean openLauncher = open;
+        SwingUtilities.invokeLater(() -> {
+            new LauncherFrame(openLauncher);
+            ss.close();
+        });
+    }
+
+    private static void checkInstalledCorrectly() {
+        boolean matched = false;
+
+        if ((Files.notExists(FileSystem.CONFIGS) && Files.notExists(FileSystem.BASE_DIR.resolve("Configs")))
+                && FileSystem.CONFIGS.getParent().toFile().listFiles().length > 1) {
+            matched = true;
+
+            if (DialogManager.optionDialog().setTitle("Warning")
+                    .setContent(new HTMLBuilder().center().text("I've detected that you may "
+                            + "not have installed this in the right location.<br/><br/>The exe or jar file should "
+                            + "be placed in it's own folder with nothing else in it.<br/><br/>Are you 100% sure "
+                            + "that's what you've done?").build())
+                    .addOption("Yes It's fine", true).addOption("Whoops. I'll change that now")
+                    .setType(DialogManager.ERROR).show() != 0) {
+                System.exit(0);
+            }
+        }
+
+        if (!matched && (Files.notExists(FileSystem.CONFIGS) && Files.notExists(FileSystem.BASE_DIR.resolve("Configs")))
+                && FileSystem.BASE_DIR.equals(FileSystem.USER_DOWNLOADS)) {
+            matched = true;
+
+            if (DialogManager.optionDialog().setTitle("Warning").setContent(new HTMLBuilder().center().text(
+                    "ATLauncher shouldn't be run from the Downloads folder.<br/><br/>Please put ATLauncher in it's own folder and run the launcher from there!")
+                    .build()).addOption("Yes It's fine", true).addOption("Whoops. I'll change that now")
+                    .setType(DialogManager.ERROR).show() != 0) {
+                System.exit(0);
+            }
+        }
+
+        if (matched) {
+            if (DialogManager.optionDialog().setTitle("Warning")
+                    .setContent(new HTMLBuilder().center()
+                            .text("Are you absolutely sure you've put ATLauncher in it's own folder?<br/><br/>If you "
+                                    + "haven't and you click 'Yes, delete my files', this may delete "
+                                    + FileSystem.CONFIGS.getParent().toFile().listFiles().length
+                                    + " files and folders.<br/><br/>Are you 100% sure?")
+                            .build())
+                    .addOption("Yes, I understand", true).addOption("No, exit and I'll put it in a folder")
+                    .setType(DialogManager.ERROR).show() != 0) {
+                System.exit(0);
+            }
+        }
     }
 
     /**
@@ -489,7 +488,7 @@ public class App {
         UIManager.put("FileChooser.readOnly", Boolean.TRUE);
         UIManager.put("ScrollBar.minimumThumbSize", new Dimension(50, 50));
 
-        if (Utils.isMac()) {
+        if (OS.isMac()) {
             InputMap im = (InputMap) UIManager.get("TextField.focusInputMap");
             im.put(KeyStroke.getKeyStroke(KeyEvent.VK_C, KeyEvent.META_DOWN_MASK), DefaultEditorKit.copyAction);
             im.put(KeyStroke.getKeyStroke(KeyEvent.VK_V, KeyEvent.META_DOWN_MASK), DefaultEditorKit.pasteAction);
@@ -568,8 +567,8 @@ public class App {
             }
         }
 
-        props.setProperty("java_version", Utils.getLauncherJavaVersion());
-        props.setProperty("location", App.settings.getBaseDir().toString());
+        props.setProperty("java_version", Java.getLauncherJavaVersion());
+        props.setProperty("location", FileSystem.BASE_DIR.toString());
         props.setProperty("executable",
                 new File(Update.class.getProtectionDomain().getCodeSource().getLocation().getPath()).getAbsolutePath());
 
@@ -598,6 +597,75 @@ public class App {
                     LogManager.logStackTrace("Failed to close atlauncher.conf FileOutputStream", e);
                 }
             }
+        }
+    }
+
+    private static void parseCommandLineArguments(String[] args) {
+        // Parse all the command line arguments
+        OptionParser parser = new OptionParser();
+        parser.accepts("updated").withOptionalArg().ofType(Boolean.class);
+        parser.accepts("skip-tray-integration").withOptionalArg().ofType(Boolean.class);
+        parser.accepts("disable-error-reporting").withOptionalArg().ofType(Boolean.class);
+        parser.accepts("skip-integration").withOptionalArg().ofType(Boolean.class);
+        parser.accepts("skip-hash-checking").withOptionalArg().ofType(Boolean.class);
+        parser.accepts("force-offline-mode").withOptionalArg().ofType(Boolean.class);
+        parser.accepts("working-dir").withRequiredArg().ofType(String.class);
+        parser.accepts("no-launcher-update").withOptionalArg().ofType(Boolean.class);
+        parser.accepts("debug").withOptionalArg().ofType(Boolean.class);
+        parser.accepts("debug-level").withRequiredArg().ofType(Integer.class);
+        parser.accepts("launch").withRequiredArg().ofType(String.class);
+
+        OptionSet options = parser.parse(args);
+        autoLaunch = options.has("launch") ? (String) options.valueOf("launch") : null;
+
+        if (options.has("updated")) {
+            wasUpdated = true;
+        }
+
+        if (options.has("debug")) {
+            LogManager.showDebug = true;
+            LogManager.debugLevel = 1;
+            LogManager.debug("Debug logging is enabled! Please note that this will remove any censoring of user data!");
+        }
+
+        if (options.has("debug-level")) {
+            LogManager.debugLevel = (Integer) options.valueOf("debug-level");
+            LogManager.debug("Debug level has been set to " + options.valueOf("debug-level") + "!");
+        }
+
+        skipTrayIntegration = options.has("skip-tray-integration");
+        if (skipTrayIntegration) {
+            LogManager.debug("Skipping tray integration!");
+        }
+
+        disableErrorReporting = options.has("disable-error-reporting");
+        if (disableErrorReporting) {
+            LogManager.debug("Disabling error reporting!");
+        }
+
+        if (options.has("working-dir")) {
+            Path workingDirTemp = Paths.get(String.valueOf(options.valueOf("working-dir")));
+            if (Files.exists(workingDirTemp) && Files.isDirectory(workingDirTemp)) {
+                LogManager.debug("Working directory set to " + workingDirTemp + "!");
+                workingDir = workingDirTemp;
+            } else {
+                LogManager.error("Cannot set working directory to " + workingDirTemp + " as it doesn't exist!");
+            }
+        }
+
+        noLauncherUpdate = options.has("no-launcher-update");
+        if (noLauncherUpdate) {
+            LogManager.debug("Not updating the launcher!");
+        }
+
+        skipIntegration = options.has("skip-integration");
+        if (skipIntegration) {
+            LogManager.debug("Skipping integration!");
+        }
+
+        skipHashChecking = options.has("skip-hash-checking");
+        if (skipHashChecking) {
+            LogManager.debug("Skipping hash checking! Don't ask for support with this enabled!");
         }
     }
 }

@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,11 +17,13 @@
  */
 package com.atlauncher.gui;
 
-import javax.swing.border.LineBorder;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Insets;
 
+import javax.swing.border.LineBorder;
+
+@SuppressWarnings("serial")
 public class CustomLineBorder extends LineBorder {
     private int insets = 0;
 

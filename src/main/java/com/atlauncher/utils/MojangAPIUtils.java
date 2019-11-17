@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,13 +17,12 @@
  */
 package com.atlauncher.utils;
 
-import com.atlauncher.Gsons;
-import com.atlauncher.data.Downloadable;
+import java.util.List;
+
 import com.atlauncher.data.mojang.api.NameHistory;
 import com.atlauncher.data.mojang.api.ProfileResponse;
+import com.atlauncher.network.Download;
 import com.google.gson.reflect.TypeToken;
-
-import java.util.List;
 
 /**
  * Various utility methods for interacting with the Mojang API.
@@ -36,22 +35,18 @@ public class MojangAPIUtils {
      * @return the UUID for the username given
      */
     public static String getUUID(String username) {
-        Downloadable downloadable = new Downloadable("https://api.mojang.com/users/profiles/minecraft/" + username,
-                false);
-
-        ProfileResponse profile = Gsons.DEFAULT.fromJson(downloadable.getContents(), ProfileResponse.class);
+        ProfileResponse profile = Download.build().setUrl("https://api.mojang.com/users/profiles/minecraft/" + username)
+                .asClass(ProfileResponse.class);
 
         return profile.getId();
     }
 
     public static String getCurrentUsername(String uuid) {
-        Downloadable downloadable = new Downloadable("https://api.mojang.com/user/profiles/" + uuid + "/names",
-                false);
-
         java.lang.reflect.Type type = new TypeToken<List<NameHistory>>() {
         }.getType();
 
-        List<NameHistory> history = Gsons.DEFAULT.fromJson(downloadable.getContents(), type);
+        List<NameHistory> history = Download.build().setUrl("https://api.mojang.com/user/profiles/" + uuid + "/names")
+                .asType(type);
 
         // Mojang API is down??
         if (history == null) {

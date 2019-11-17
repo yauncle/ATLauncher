@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,25 +17,22 @@
  */
 package com.atlauncher.gui;
 
-import com.atlauncher.App;
-import com.atlauncher.data.Language;
-import com.atlauncher.evnt.listener.ConsoleCloseListener;
-import com.atlauncher.evnt.listener.ConsoleOpenListener;
-import com.atlauncher.evnt.listener.RelocalizationListener;
-import com.atlauncher.evnt.manager.ConsoleCloseManager;
-import com.atlauncher.evnt.manager.ConsoleOpenManager;
-import com.atlauncher.evnt.manager.RelocalizationManager;
-import com.atlauncher.utils.HTMLUtils;
-
 import javax.swing.JMenuItem;
-import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
-public final class TrayMenu extends JPopupMenu implements RelocalizationListener, ConsoleCloseListener,
-        ConsoleOpenListener {
+import com.atlauncher.App;
+import com.atlauncher.builders.HTMLBuilder;
+import com.atlauncher.evnt.listener.ConsoleCloseListener;
+import com.atlauncher.evnt.listener.ConsoleOpenListener;
+import com.atlauncher.evnt.manager.ConsoleCloseManager;
+import com.atlauncher.evnt.manager.ConsoleOpenManager;
+import com.atlauncher.managers.DialogManager;
+
+import org.mini2Dx.gettext.GetText;
+
+@SuppressWarnings("serial")
+public final class TrayMenu extends JPopupMenu implements ConsoleCloseListener, ConsoleOpenListener {
 
     private final JMenuItem killMCButton = new JMenuItem();
     private final JMenuItem tcButton = new JMenuItem();
@@ -46,11 +43,9 @@ public final class TrayMenu extends JPopupMenu implements RelocalizationListener
 
         this.setMinecraftLaunched(false);
 
-        this.killMCButton.setText("Kill Minecraft");
-        this.tcButton.setText("Toggle Console");
-        this.quitButton.setText("Quit");
-
-        this.tcButton.setEnabled(false);
+        this.killMCButton.setText(GetText.tr("Kill Minecraft"));
+        this.tcButton.setText(GetText.tr("Toggle console"));
+        this.quitButton.setText(GetText.tr("Quit"));
 
         this.add(this.killMCButton);
         this.add(this.tcButton);
@@ -59,49 +54,26 @@ public final class TrayMenu extends JPopupMenu implements RelocalizationListener
 
         ConsoleCloseManager.addListener(this);
         ConsoleOpenManager.addListener(this);
-        RelocalizationManager.addListener(this);
 
         this.addActionListeners();
     }
 
     private void addActionListeners() {
-        this.killMCButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                SwingUtilities.invokeLater(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (App.settings.isMinecraftLaunched()) {
-                            int ret = JOptionPane.showConfirmDialog(App.settings.getParent(), HTMLUtils
-                                    .centerParagraph(Language.INSTANCE.localizeWithReplace("console" + "" +
-                                    ".killsure", "<br/><br/>")), Language.INSTANCE.localize("console" + ".kill"),
-                                    JOptionPane.YES_NO_OPTION);
+        this.killMCButton.addActionListener(e -> SwingUtilities.invokeLater(() -> {
+            if (App.settings.isMinecraftLaunched()) {
+                int ret = DialogManager.yesNoDialog().setTitle(GetText.tr("Kill Minecraft"))
+                        .setContent(new HTMLBuilder().center().text(GetText.tr(
+                                "Are you sure you want to kill the Minecraft process?<br/>Doing so can cause corruption of your saves"))
+                                .build())
+                        .setType(DialogManager.ERROR).show();
 
-                            if (ret == JOptionPane.YES_OPTION) {
-                                App.settings.killMinecraft();
-                            }
-                        }
-                    }
-                });
+                if (ret == DialogManager.YES_OPTION) {
+                    App.settings.killMinecraft();
+                }
             }
-        });
-        this.tcButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                App.settings.getConsole().setVisible(!App.settings.getConsole().isVisible());
-            }
-        });
-        this.quitButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                System.exit(0);
-            }
-        });
-    }
-
-    public void localize() {
-        this.tcButton.setEnabled(true);
-        this.onRelocalization();
+        }));
+        this.tcButton.addActionListener(e -> App.console.setVisible(!App.console.isVisible()));
+        this.quitButton.addActionListener(e -> System.exit(0));
     }
 
     public void setMinecraftLaunched(boolean l) {
@@ -110,22 +82,11 @@ public final class TrayMenu extends JPopupMenu implements RelocalizationListener
 
     @Override
     public void onConsoleClose() {
-        this.tcButton.setText(Language.INSTANCE.localize("console.show"));
+        this.tcButton.setText(GetText.tr("Show Console"));
     }
 
     @Override
     public void onConsoleOpen() {
-        this.tcButton.setText(Language.INSTANCE.localize("console.hide"));
-    }
-
-    @Override
-    public void onRelocalization() {
-        this.killMCButton.setText(Language.INSTANCE.localize("console.kill"));
-        this.quitButton.setText(Language.INSTANCE.localize("common.quit"));
-        if (App.settings.getConsole().isVisible()) {
-            this.tcButton.setText(Language.INSTANCE.localize("console.hide"));
-        } else {
-            this.tcButton.setText(Language.INSTANCE.localize("console.show"));
-        }
+        this.tcButton.setText(GetText.tr("Hide Console"));
     }
 }

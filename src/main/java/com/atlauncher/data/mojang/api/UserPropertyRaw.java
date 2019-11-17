@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,11 +17,12 @@
  */
 package com.atlauncher.data.mojang.api;
 
+import java.io.IOException;
+
 import com.atlauncher.Gsons;
 import com.atlauncher.annot.Json;
-import com.atlauncher.utils.Base64;
 
-import java.io.IOException;
+import net.iharder.Base64;
 
 @Json
 public class UserPropertyRaw {

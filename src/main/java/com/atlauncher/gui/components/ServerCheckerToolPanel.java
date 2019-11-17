@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,30 +17,29 @@
  */
 package com.atlauncher.gui.components;
 
-import com.atlauncher.App;
-import com.atlauncher.data.Language;
-import com.atlauncher.evnt.listener.SettingsListener;
-import com.atlauncher.evnt.manager.SettingsManager;
-import com.atlauncher.gui.dialogs.ServerListForCheckerDialog;
-import com.atlauncher.utils.HTMLUtils;
-import com.atlauncher.utils.Utils;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 
 import javax.swing.BorderFactory;
 import javax.swing.JLabel;
 import javax.swing.border.BevelBorder;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
+import com.atlauncher.App;
+import com.atlauncher.builders.HTMLBuilder;
+import com.atlauncher.evnt.listener.SettingsListener;
+import com.atlauncher.evnt.manager.SettingsManager;
+import com.atlauncher.gui.dialogs.ServerListForCheckerDialog;
+import com.atlauncher.network.Analytics;
+
+import org.mini2Dx.gettext.GetText;
+
+@SuppressWarnings("serial")
 public class ServerCheckerToolPanel extends AbstractToolPanel implements ActionListener, SettingsListener {
-    /**
-     * Auto generated serial.
-     */
-    private static final long serialVersionUID = 1964636496849129267L;
+    private final JLabel TITLE_LABEL = new JLabel(GetText.tr("Server Checker"));
 
-    private final JLabel TITLE_LABEL = new JLabel(Language.INSTANCE.localize("tools.serverchecker"));
-
-    private final JLabel INFO_LABEL = new JLabel(HTMLUtils.centerParagraph(Utils.splitMultilinedString(Language
-            .INSTANCE.localize("tools.serverchecker.info"), 60, "<br>")));
+    private final JLabel INFO_LABEL = new JLabel(new HTMLBuilder().center().split(60).text(GetText.tr(
+            "This tool checks specified Minecraft servers to see if they are up or not and how many players are logged in. Settings can be configured in the Settings tab under the Tools sub tab."))
+            .build());
 
     public ServerCheckerToolPanel() {
         TITLE_LABEL.setFont(BOLD_FONT);
@@ -60,6 +59,7 @@ public class ServerCheckerToolPanel extends AbstractToolPanel implements ActionL
     @Override
     public void actionPerformed(ActionEvent e) {
         if (e.getSource() == LAUNCH_BUTTON) {
+            Analytics.sendEvent("ServerChecker", "Run", "Tool");
             new ServerListForCheckerDialog();
         }
     }

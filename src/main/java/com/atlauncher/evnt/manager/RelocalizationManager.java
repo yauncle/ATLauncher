@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,17 +15,17 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package com.atlauncher.evnt.manager;
 
-import com.atlauncher.evnt.listener.RelocalizationListener;
-
-import javax.swing.SwingUtilities;
 import java.util.LinkedList;
 import java.util.List;
 
+import javax.swing.SwingUtilities;
+
+import com.atlauncher.evnt.listener.RelocalizationListener;
+
 public final class RelocalizationManager {
-    private static final List<RelocalizationListener> listeners = new LinkedList<RelocalizationListener>();
+    private static final List<RelocalizationListener> listeners = new LinkedList<>();
 
     public static synchronized void addListener(RelocalizationListener listener) {
         listeners.add(listener);
@@ -36,12 +36,9 @@ public final class RelocalizationManager {
     }
 
     public static synchronized void post() {
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                for (RelocalizationListener listener : listeners) {
-                    listener.onRelocalization();
-                }
+        SwingUtilities.invokeLater(() -> {
+            for (RelocalizationListener listener : listeners) {
+                listener.onRelocalization();
             }
         });
     }

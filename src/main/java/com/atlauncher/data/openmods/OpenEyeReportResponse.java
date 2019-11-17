@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,8 +17,9 @@
  */
 package com.atlauncher.data.openmods;
 
-import com.atlauncher.data.Language;
 import com.atlauncher.utils.Utils;
+
+import org.mini2Dx.gettext.GetText;
 
 /**
  * The Class OpenEyeReportResponse contains information returned from OpenMods OpenEye system when a pending crash
@@ -84,10 +85,10 @@ public class OpenEyeReportResponse {
      */
     public String getNoteDisplay() {
         if (this.hasNote()) {
-            return Language.INSTANCE.localize("instance.openeyehasnote") + "<br/><br/>" + Utils.splitMultilinedString
+            return GetText.tr("A note attached to the crash can be seen below:") + "<br/><br/>" + Utils.splitMultilinedString
                     (this.getNote(), 100, "<br/>") + "<br/><br/>";
         } else {
-            return Language.INSTANCE.localize("instance.openeyenonote") + "<br/><br/>";
+            return GetText.tr("There is no note attached to this crash.") + "<br/><br/>";
         }
     }
 }

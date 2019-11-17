@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,30 +17,21 @@
  */
 package com.atlauncher.gui.tabs.settings;
 
-import com.atlauncher.App;
-import com.atlauncher.data.Language;
-import com.atlauncher.evnt.listener.RelocalizationListener;
-import com.atlauncher.evnt.manager.RelocalizationManager;
-import com.atlauncher.gui.components.JLabelWithHover;
-import com.atlauncher.utils.Utils;
+import java.awt.GridBagConstraints;
 
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
-import javax.swing.JSpinner;
-import javax.swing.SpinnerModel;
-import javax.swing.SpinnerNumberModel;
-import java.awt.GridBagConstraints;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+
+import com.atlauncher.App;
+import com.atlauncher.gui.components.JLabelWithHover;
+import com.atlauncher.utils.Utils;
+
+import org.mini2Dx.gettext.GetText;
 
 @SuppressWarnings("serial")
-public class LoggingSettingsTab extends AbstractSettingsTab implements RelocalizationListener {
+public class LoggingSettingsTab extends AbstractSettingsTab {
     private JLabelWithHover forgeLoggingLevelLabel;
     private JComboBox<String> forgeLoggingLevel;
-
-    private JLabelWithHover daysOfLogsToKeepLabel;
-    private SpinnerModel daysOfLogsToKeepModel;
-    private JSpinner daysOfLogsToKeep;
 
     private JLabelWithHover enableLeaderboardsLabel;
     private JCheckBox enableLeaderboards;
@@ -48,25 +39,26 @@ public class LoggingSettingsTab extends AbstractSettingsTab implements Relocaliz
     private JLabelWithHover enableLoggingLabel;
     private JCheckBox enableLogs;
 
+    private JLabelWithHover enableAnalyticsLabel;
+    private JCheckBox enableAnalytics;
+
     private JLabelWithHover enableOpenEyeReportingLabel;
     private JCheckBox enableOpenEyeReporting;
 
     public LoggingSettingsTab() {
-        RelocalizationManager.addListener(this);
         // Forge Logging Level
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.insets = LABEL_INSETS;
         gbc.anchor = GridBagConstraints.BASELINE_TRAILING;
-        forgeLoggingLevelLabel = new JLabelWithHover(Language.INSTANCE.localize("settings.forgelogginglevel") + ":",
-                HELP_ICON, "<html>" + Language.INSTANCE.localizeWithReplace("settings.forgelogginglevelhelp",
-                "<br/><br/>") + "</html>");
+        forgeLoggingLevelLabel = new JLabelWithHover(GetText.tr("Forge Logging Level") + ":", HELP_ICON, "<html>"
+                + GetText.tr("This determines the type of logging that Forge should report back to you.") + "</html>");
         add(forgeLoggingLevelLabel, gbc);
 
         gbc.gridx++;
         gbc.insets = FIELD_INSETS;
         gbc.anchor = GridBagConstraints.BASELINE_LEADING;
-        forgeLoggingLevel = new JComboBox<String>();
+        forgeLoggingLevel = new JComboBox<>();
         forgeLoggingLevel.addItem("SEVERE");
         forgeLoggingLevel.addItem("WARNING");
         forgeLoggingLevel.addItem("INFO");
@@ -77,33 +69,14 @@ public class LoggingSettingsTab extends AbstractSettingsTab implements Relocaliz
         forgeLoggingLevel.setSelectedItem(App.settings.getForgeLoggingLevel());
         add(forgeLoggingLevel, gbc);
 
-        // Days of logs to keep
-
-        gbc.gridx = 0;
-        gbc.gridy++;
-        gbc.insets = LABEL_INSETS;
-        gbc.anchor = GridBagConstraints.BASELINE_TRAILING;
-        daysOfLogsToKeepLabel = new JLabelWithHover(Language.INSTANCE.localize("settings.daysoflogstokeep") + ":",
-                HELP_ICON, Language.INSTANCE.localize("settings.daysoflogstokeephelp"));
-        add(daysOfLogsToKeepLabel, gbc);
-
-        daysOfLogsToKeepModel = new SpinnerNumberModel(App.settings.getDaysOfLogsToKeep(), 1, 30, 1);
-
-        gbc.gridx++;
-        gbc.insets = FIELD_INSETS;
-        gbc.anchor = GridBagConstraints.BASELINE_LEADING;
-        daysOfLogsToKeep = new JSpinner(daysOfLogsToKeepModel);
-        daysOfLogsToKeep.setValue(App.settings.getDaysOfLogsToKeep());
-        add(daysOfLogsToKeep, gbc);
-
         // Enable Leaderboards
 
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.insets = LABEL_INSETS;
         gbc.anchor = GridBagConstraints.BASELINE_TRAILING;
-        enableLeaderboardsLabel = new JLabelWithHover(Language.INSTANCE.localize("settings.leaderboards") + "?",
-                HELP_ICON, Language.INSTANCE.localize("settings.leaderboardshelp"));
+        enableLeaderboardsLabel = new JLabelWithHover(GetText.tr("Enable Leaderboards") + "?", HELP_ICON,
+                GetText.tr("If you want to participate in the Leaderboards."));
         add(enableLeaderboardsLabel, gbc);
 
         gbc.gridx++;
@@ -124,27 +97,26 @@ public class LoggingSettingsTab extends AbstractSettingsTab implements Relocaliz
         gbc.gridy++;
         gbc.insets = LABEL_INSETS;
         gbc.anchor = GridBagConstraints.BASELINE_TRAILING;
-        enableLoggingLabel = new JLabelWithHover(Language.INSTANCE.localize("settings.logging") + "?", HELP_ICON,
-                "<html>" + Language.INSTANCE.localizeWithReplace("settings.logginghelp", "<br/>" + "</html>"));
+        enableLoggingLabel = new JLabelWithHover(GetText.tr("Enable Logging") + "?", HELP_ICON, "<html>" + GetText.tr(
+                "The Launcher sends back anonymous usage and error logs<br/>to our servers in order to make the Launcher and Packs<br/>better. If you don't want this to happen then simply<br/>disable this option.")
+                + "</html>");
         add(enableLoggingLabel, gbc);
 
         gbc.gridx++;
         gbc.insets = FIELD_INSETS;
         gbc.anchor = GridBagConstraints.BASELINE_LEADING;
         enableLogs = new JCheckBox();
-        enableLogs.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                if (!enableLogs.isSelected()) {
-                    enableOpenEyeReporting.setSelected(false);
-                    enableOpenEyeReporting.setEnabled(false);
-                    enableLeaderboards.setSelected(false);
-                    enableLeaderboards.setEnabled(false);
-                } else {
-                    enableOpenEyeReporting.setSelected(true);
-                    enableOpenEyeReporting.setEnabled(true);
-                    enableLeaderboards.setSelected(true);
-                    enableLeaderboards.setEnabled(true);
-                }
+        enableLogs.addActionListener(e -> {
+            if (!enableLogs.isSelected()) {
+                enableOpenEyeReporting.setSelected(false);
+                enableOpenEyeReporting.setEnabled(false);
+                enableLeaderboards.setSelected(false);
+                enableLeaderboards.setEnabled(false);
+            } else {
+                enableOpenEyeReporting.setSelected(true);
+                enableOpenEyeReporting.setEnabled(true);
+                enableLeaderboards.setSelected(true);
+                enableLeaderboards.setEnabled(true);
             }
         });
         if (App.settings.enableLogs()) {
@@ -152,15 +124,37 @@ public class LoggingSettingsTab extends AbstractSettingsTab implements Relocaliz
         }
         add(enableLogs, gbc);
 
+        // Enable Analytics
+
+        gbc.gridx = 0;
+        gbc.gridy++;
+        gbc.insets = LABEL_INSETS;
+        gbc.anchor = GridBagConstraints.BASELINE_TRAILING;
+        enableAnalyticsLabel = new JLabelWithHover(GetText.tr("Enable Anonymous Analytics") + "?", HELP_ICON,
+                "<html>" + GetText.tr(
+                        "The Launcher sends back anonymous analytics to Google Analytics<br/>in order to track what people do and don't use in the launcher.<br/>This helps determine what new features we implement in the future.<br/>All analytics are anonymous and contain no user/instance information in it at all.<br/>If you don't want to send anonymous analytics, you can disable this option.")
+                        + "</html>");
+        add(enableAnalyticsLabel, gbc);
+
+        gbc.gridx++;
+        gbc.insets = FIELD_INSETS;
+        gbc.anchor = GridBagConstraints.BASELINE_LEADING;
+        enableAnalytics = new JCheckBox();
+        if (App.settings.enableAnalytics()) {
+            enableAnalytics.setSelected(true);
+        }
+        add(enableAnalytics, gbc);
+
         // Enable OpenEye Reporting
 
         gbc.gridx = 0;
         gbc.gridy++;
         gbc.insets = LABEL_INSETS;
         gbc.anchor = GridBagConstraints.BASELINE_TRAILING;
-        enableOpenEyeReportingLabel = new JLabelWithHover(Language.INSTANCE.localize("settings.openeye") + "?",
-                HELP_ICON, "<html>" + Utils.splitMultilinedString(Language.INSTANCE.localize("settings" + "" +
-                ".openeyehelp"), 80, "<br/>") + "</html>");
+        enableOpenEyeReportingLabel = new JLabelWithHover(GetText.tr("Enable OpenEye Reporting") + "?", HELP_ICON,
+                "<html>" + Utils.splitMultilinedString(GetText.tr(
+                        "OpenEye is a mod/project created by the OpenMods team which aims to help gather statistics and crash logs from Minecraft in order to help users and modders discover and fix issues with mods. With the OpenEye mod installed (each ModPack chooses if they wish to install it or not, it's not installed by default to all packs by the Launcher) everytime Minecraft crashes the OpenEye report is sent to OpenEye for analysis and if a note from the modder has been added on the cause/fix it will be displayed to you. For more information please see http://openeye.openblocks.info"),
+                        80, "<br/>") + "</html>");
         add(enableOpenEyeReportingLabel, gbc);
 
         gbc.gridx++;
@@ -178,35 +172,14 @@ public class LoggingSettingsTab extends AbstractSettingsTab implements Relocaliz
 
     public void save() {
         App.settings.setForgeLoggingLevel((String) forgeLoggingLevel.getSelectedItem());
-        App.settings.setDaysOfLogsToKeep((Integer) daysOfLogsToKeep.getValue());
         App.settings.setEnableLeaderboards(enableLeaderboards.isSelected());
         App.settings.setEnableLogs(enableLogs.isSelected());
+        App.settings.setEnableAnalytics(enableAnalytics.isSelected());
         App.settings.setEnableOpenEyeReporting(enableOpenEyeReporting.isSelected());
     }
 
     @Override
     public String getTitle() {
-        return Language.INSTANCE.localize("settings.loggingtab");
-    }
-
-    @Override
-    public void onRelocalization() {
-        this.forgeLoggingLevelLabel.setText(Language.INSTANCE.localize("settings" + ".forgelogginglevel") + ":");
-        this.forgeLoggingLevelLabel.setToolTipText("<html>" + Language.INSTANCE.localizeWithReplace("settings" + "" +
-                ".forgelogginglevelhelp", "<br/><br/>") + "</html>");
-
-        this.daysOfLogsToKeepLabel.setText(Language.INSTANCE.localize("settings.daysoflogstokeep") + "?");
-        this.daysOfLogsToKeepLabel.setToolTipText(Language.INSTANCE.localize("settings.daysoflogstokeephelp"));
-
-        this.enableLeaderboardsLabel.setText(Language.INSTANCE.localize("settings.leaderboards") + "?");
-        this.enableLeaderboardsLabel.setToolTipText(Language.INSTANCE.localize("settings.leaderboardshelp"));
-
-        this.enableLoggingLabel.setText(Language.INSTANCE.localize("settings.logging") + "?");
-        this.enableLoggingLabel.setToolTipText("<html>" + Language.INSTANCE.localizeWithReplace("settings" + "" +
-                ".logginghelp", "<br/>" + "</html>"));
-
-        this.enableOpenEyeReportingLabel.setText(Language.INSTANCE.localize("settings.openeye") + "?");
-        this.enableOpenEyeReportingLabel.setToolTipText("<html>" + Utils.splitMultilinedString(Language.INSTANCE
-                .localize("settings.openeyehelp"), 80, "<br/>") + "</html>");
+        return GetText.tr("Logging");
     }
 }

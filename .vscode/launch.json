@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Launch",
+            "request": "launch",
+            "mainClass": "com.atlauncher.App",
+            "projectName": "ATLauncher",
+            "cwd": "${workspaceFolder}/testLauncher",
+            "args": "--debug --debug-level 3 --disable-error-reporting --no-launcher-update"
+        }
+    ]
+}

@@ -1,7 +1,6 @@
 # Changelog
 
-## 3.2.6.0
+## 3.3.2.0
 
-- Add featured packs tab
-- Add message to accounts tab with info on what account to use
-- Fix loading Forge loader on older MC versions
+- Add in ability to download worlds from CurseForge
+- Fix mods from curse able to be installed with no loader

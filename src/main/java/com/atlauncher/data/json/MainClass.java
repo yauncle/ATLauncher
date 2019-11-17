@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,9 +21,9 @@ import com.atlauncher.annot.Json;
 
 @Json
 public class MainClass {
-    private String mainClass;
-    private String depends;
-    private String dependsGroup;
+    public String mainClass;
+    public String depends;
+    public String dependsGroup;
 
     public String getMainClass() {
         return this.mainClass;

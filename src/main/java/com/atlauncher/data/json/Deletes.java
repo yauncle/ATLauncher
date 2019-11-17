@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,17 +17,25 @@
  */
 package com.atlauncher.data.json;
 
-import com.atlauncher.annot.Json;
-
 import java.util.List;
+
+import com.atlauncher.annot.Json;
 
 @Json
 public class Deletes {
     private List<Delete> files;
     private List<Delete> folders;
 
+    public boolean hasFileDeletes() {
+        return this.files != null;
+    }
+
     public List<Delete> getFiles() {
         return this.files;
+    }
+
+    public boolean hasFolderDeletes() {
+        return this.folders != null;
     }
 
     public List<Delete> getFolders() {

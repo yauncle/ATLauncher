@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,14 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package com.atlauncher.utils;
 
-import com.atlauncher.App;
-import com.atlauncher.LogManager;
-import com.atlauncher.exceptions.ChunkyException;
-
-import javax.swing.text.html.StyleSheet;
 import java.awt.Font;
 import java.awt.GraphicsEnvironment;
 import java.io.File;
@@ -36,8 +30,14 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import javax.swing.text.html.StyleSheet;
+
+import com.atlauncher.App;
+import com.atlauncher.LogManager;
+import com.atlauncher.exceptions.ChunkyException;
+
 public final class Resources {
-    private static final Map<String, Object> resources = new HashMap<String, Object>();
+    private static final Map<String, Object> resources = new HashMap<>();
     public static final String[] FONT_FAMILIES = GraphicsEnvironment.getLocalGraphicsEnvironment()
             .getAvailableFontFamilyNames();
 

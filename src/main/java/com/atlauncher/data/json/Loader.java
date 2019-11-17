@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,20 +17,32 @@
  */
 package com.atlauncher.data.json;
 
-import com.atlauncher.annot.Json;
-import com.atlauncher.workers.InstanceInstaller;
-
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Map;
+
+import com.atlauncher.LogManager;
+import com.atlauncher.annot.Json;
+import com.atlauncher.data.minecraft.loaders.LoaderVersion;
+import com.atlauncher.workers.InstanceInstaller;
 
 @Json
 public class Loader {
-    private String type;
-    private Map<String, Object> metadata;
-    private String className;
+    public String type;
+    public boolean choose = false;
+    public Map<String, Object> metadata;
+    public String className;
+    public String chooseClassName;
+    public String chooseMethod;
 
     public String getType() {
         return this.type;
+    }
+
+    public boolean canChoose() {
+        return this.choose;
     }
 
     public Map<String, Object> getMetadata() {
@@ -41,13 +53,39 @@ public class Loader {
         return this.className;
     }
 
-    public com.atlauncher.data.loaders.Loader getLoader(File tempDir, InstanceInstaller instanceInstaller)
-            throws InstantiationException, IllegalAccessException, ClassNotFoundException {
-        com.atlauncher.data.loaders.Loader instance = (com.atlauncher.data.loaders.Loader) Class.forName(this.className)
+    public String getChooseClassName() {
+        return this.chooseClassName;
+    }
+
+    public String getChooseMethod() {
+        return this.chooseMethod;
+    }
+
+    public com.atlauncher.data.minecraft.loaders.Loader getLoader(File tempDir, InstanceInstaller instanceInstaller,
+            LoaderVersion loaderVersion) throws InstantiationException, IllegalAccessException, ClassNotFoundException {
+        com.atlauncher.data.minecraft.loaders.Loader instance = (com.atlauncher.data.minecraft.loaders.Loader) Class
+                .forName(this.className.replace("com.atlauncher.data.loaders", "com.atlauncher.data.minecraft.loaders"))
                 .newInstance();
 
-        instance.set(this.metadata, tempDir, instanceInstaller);
+        instance.set(this.metadata, tempDir, instanceInstaller, loaderVersion);
 
         return instance;
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<LoaderVersion> getChoosableVersions(String minecraft) {
+        try {
+            Method method = Class
+                    .forName(this.chooseClassName.replace("com.atlauncher.data.loaders",
+                            "com.atlauncher.data.minecraft.loaders"))
+                    .getDeclaredMethod(this.chooseMethod, String.class);
+
+            return (List<LoaderVersion>) method.invoke(null, minecraft);
+        } catch (NoSuchMethodException | SecurityException | ClassNotFoundException | IllegalAccessException
+                | IllegalArgumentException | InvocationTargetException e) {
+            LogManager.logStackTrace(e);
+        }
+
+        return null;
     }
 }

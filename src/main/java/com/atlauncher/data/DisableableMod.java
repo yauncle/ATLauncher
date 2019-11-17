@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,35 +17,46 @@
  */
 package com.atlauncher.data;
 
-import com.atlauncher.App;
-import com.atlauncher.LogManager;
-import com.atlauncher.utils.Utils;
-
 import java.awt.Color;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarInputStream;
 import java.util.jar.JarOutputStream;
 
-public class DisableableMod implements Serializable {
-    private static final long serialVersionUID = 8429405767313518704L;
-    private String name;
-    private String version;
-    private boolean optional;
-    private String file;
-    private Type type;
-    private Color colour;
-    private String description;
-    private boolean disabled;
-    private boolean userAdded = false; // Default to not being user added
-    private boolean wasSelected = true; // Default to it being selected on install
+import com.atlauncher.FileSystem;
+import com.atlauncher.LogManager;
+import com.atlauncher.data.curse.CurseFile;
+import com.atlauncher.gui.dialogs.CurseModFileSelectorDialog;
+import com.atlauncher.managers.DialogManager;
+import com.atlauncher.network.Analytics;
+import com.atlauncher.utils.CurseApi;
+import com.atlauncher.utils.Utils;
 
-    public DisableableMod(String name, String version, boolean optional, String file, Type type, Color colour, String
-            description, boolean disabled, boolean userAdded, boolean wasSelected) {
+import org.mini2Dx.gettext.GetText;
+
+@SuppressWarnings("serial")
+public class DisableableMod implements Serializable {
+    public String name;
+    public String version;
+    public boolean optional;
+    public String file;
+    public Type type;
+    public Color colour;
+    public String description;
+    public boolean disabled;
+    public boolean userAdded = false; // Default to not being user added
+    public boolean wasSelected = true; // Default to it being selected on install
+    public Integer curseModId;
+    public Integer curseFileId;
+
+    public DisableableMod(String name, String version, boolean optional, String file, Type type, Color colour,
+            String description, boolean disabled, boolean userAdded, boolean wasSelected, Integer curseModId,
+            Integer curseFileId) {
         this.name = name;
         this.version = version;
         this.optional = optional;
@@ -56,11 +67,21 @@ public class DisableableMod implements Serializable {
         this.disabled = disabled;
         this.userAdded = userAdded;
         this.wasSelected = wasSelected;
+        this.curseModId = curseModId;
+        this.curseFileId = curseFileId;
     }
 
-    public DisableableMod(String name, String version, boolean optional, String file, Type type, Color colour, String
-            description, boolean disabled, boolean userAdded) {
-        this(name, version, optional, file, type, colour, description, disabled, userAdded, true);
+    public DisableableMod(String name, String version, boolean optional, String file, Type type, Color colour,
+            String description, boolean disabled, boolean userAdded, boolean wasSelected) {
+        this(name, version, optional, file, type, colour, description, disabled, userAdded, wasSelected, null, null);
+    }
+
+    public DisableableMod(String name, String version, boolean optional, String file, Type type, Color colour,
+            String description, boolean disabled, boolean userAdded) {
+        this(name, version, optional, file, type, colour, description, disabled, userAdded, true, null, null);
+    }
+
+    public DisableableMod() {
     }
 
     public String getName() {
@@ -106,6 +127,18 @@ public class DisableableMod implements Serializable {
         return this.userAdded;
     }
 
+    public boolean isFromCurse() {
+        return this.curseModId != null && this.curseFileId != null;
+    }
+
+    public Integer getCurseModId() {
+        return this.curseModId;
+    }
+
+    public Integer getCurseFileId() {
+        return this.curseFileId;
+    }
+
     public String getFilename() {
         return this.file;
     }
@@ -118,7 +151,7 @@ public class DisableableMod implements Serializable {
             if (Utils.moveFile(getDisabledFile(instance), getFile(instance), true)) {
                 if (this.type == Type.jar) {
                     File inputFile = instance.getMinecraftJar();
-                    File outputTmpFile = new File(App.settings.getTempDir(), instance.getSafeName() + "-minecraft.jar");
+                    File outputTmpFile = FileSystem.TEMP.resolve(instance.getSafeName() + "-minecraft.jar").toFile();
                     if (Utils.hasMetaInf(inputFile)) {
                         try {
                             JarInputStream input = new JarInputStream(new FileInputStream(inputFile));
@@ -155,9 +188,31 @@ public class DisableableMod implements Serializable {
         return false;
     }
 
+    public boolean enable(InstanceV2 instance) {
+        if (this.disabled) {
+            if (!getFile(instance).getParentFile().exists()) {
+                getFile(instance).getParentFile().mkdir();
+            }
+            if (Utils.moveFile(getDisabledFile(instance), getFile(instance), true)) {
+                this.disabled = false;
+            }
+        }
+        return false;
+    }
+
     public boolean disable(Instance instance) {
         if (!this.disabled) {
             if (Utils.moveFile(getFile(instance), instance.getDisabledModsDirectory(), false)) {
+                this.disabled = true;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean disable(InstanceV2 instance) {
+        if (!this.disabled) {
+            if (Utils.moveFile(getFile(instance), getDisabledFile(instance), true)) {
                 this.disabled = true;
                 return true;
             }
@@ -169,38 +224,81 @@ public class DisableableMod implements Serializable {
         return new File(instance.getDisabledModsDirectory(), this.file);
     }
 
+    public File getDisabledFile(InstanceV2 instance) {
+        return instance.getRoot().resolve("disabledmods/" + this.file).toFile();
+    }
+
     public File getFile(Instance instance) {
         File dir = null;
         switch (type) {
-            case jar:
-            case forge:
-            case mcpc:
-                dir = instance.getJarModsDirectory();
-                break;
-            case texturepack:
-                dir = instance.getTexturePacksDirectory();
-                break;
-            case resourcepack:
-                dir = instance.getResourcePacksDirectory();
-                break;
-            case mods:
-                dir = instance.getModsDirectory();
-                break;
-            case ic2lib:
-                dir = instance.getIC2LibDirectory();
-                break;
-            case denlib:
-                dir = instance.getDenLibDirectory();
-                break;
-            case coremods:
-                dir = instance.getCoreModsDirectory();
-                break;
-            case shaderpack:
-                dir = instance.getShaderPacksDirectory();
-                break;
-            default:
-                LogManager.warn("Unsupported mod for enabling/disabling " + this.name);
-                break;
+        case jar:
+        case forge:
+        case mcpc:
+            dir = instance.getJarModsDirectory();
+            break;
+        case texturepack:
+            dir = instance.getTexturePacksDirectory();
+            break;
+        case resourcepack:
+            dir = instance.getResourcePacksDirectory();
+            break;
+        case mods:
+            dir = instance.getModsDirectory();
+            break;
+        case ic2lib:
+            dir = instance.getIC2LibDirectory();
+            break;
+        case denlib:
+            dir = instance.getDenLibDirectory();
+            break;
+        case coremods:
+            dir = instance.getCoreModsDirectory();
+            break;
+        case shaderpack:
+            dir = instance.getShaderPacksDirectory();
+            break;
+        default:
+            LogManager.warn("Unsupported mod for enabling/disabling " + this.name);
+            break;
+        }
+        if (dir == null) {
+            return null;
+        }
+        return new File(dir, file);
+    }
+
+    public File getFile(InstanceV2 instance) {
+        File dir = null;
+        switch (type) {
+        case jar:
+        case forge:
+        case mcpc:
+            dir = instance.getRoot().resolve("jarmods").toFile();
+            break;
+        case texturepack:
+            dir = instance.getRoot().resolve("texturepacks").toFile();
+            break;
+        case resourcepack:
+            dir = instance.getRoot().resolve("resourcepacks").toFile();
+            break;
+        case mods:
+            dir = instance.getRoot().resolve("mods").toFile();
+            break;
+        case ic2lib:
+            dir = instance.getRoot().resolve("mods/ic2").toFile();
+            break;
+        case denlib:
+            dir = instance.getRoot().resolve("mods/denlib").toFile();
+            break;
+        case coremods:
+            dir = instance.getRoot().resolve("coremods").toFile();
+            break;
+        case shaderpack:
+            dir = instance.getRoot().resolve("shaderpacks").toFile();
+            break;
+        default:
+            LogManager.warn("Unsupported mod for enabling/disabling " + this.name);
+            break;
         }
         if (dir == null) {
             return null;
@@ -212,4 +310,49 @@ public class DisableableMod implements Serializable {
         return this.type;
     }
 
+    public boolean checkForUpdate(InstanceV2 instance) {
+        Analytics.sendEvent(instance.launcher.pack + " - " + instance.launcher.version, "UpdateMods", "InstanceV2");
+        List<CurseFile> curseModFiles = CurseApi.getFilesForMod(curseModId);
+
+        if (!curseModFiles.stream().anyMatch(mod -> mod.id > curseFileId)) {
+            DialogManager.okDialog().setTitle(GetText.tr("No Updates Found"))
+                    .setContent(GetText.tr("No updates were found for {0}.", name)).show();
+            return false;
+        }
+
+        new CurseModFileSelectorDialog(CurseApi.getModById(curseModId), instance, curseFileId);
+
+        return true;
+    }
+
+    public boolean checkForUpdate(Instance instance) {
+        Analytics.sendEvent(instance.getPackName() + " - " + instance.getVersion(), "UpdateMods", "Instance");
+        List<CurseFile> curseModFiles = CurseApi.getFilesForMod(curseModId);
+
+        if (!curseModFiles.stream().anyMatch(mod -> mod.id > curseFileId)) {
+            DialogManager.okDialog().setTitle(GetText.tr("No Updates Found"))
+                    .setContent(GetText.tr("No updates were found for {0}.", name)).show();
+            return false;
+        }
+
+        new CurseModFileSelectorDialog(CurseApi.getModById(curseModId), instance, curseFileId);
+
+        return true;
+    }
+
+    public boolean reinstall(InstanceV2 instance) {
+        Analytics.sendEvent(instance.launcher.pack + " - " + instance.launcher.version, "ReinstallMods", "InstanceV2");
+
+        new CurseModFileSelectorDialog(CurseApi.getModById(curseModId), instance, curseFileId);
+
+        return true;
+    }
+
+    public boolean reinstall(Instance instance) {
+        Analytics.sendEvent(instance.getPackName() + " - " + instance.getVersion(), "ReinstallMods", "Instance");
+
+        new CurseModFileSelectorDialog(CurseApi.getModById(curseModId), instance, curseFileId);
+
+        return true;
+    }
 }

@@ -116,7 +116,6 @@ public class ServerListPing17 {
         dataOutputStream.writeByte(0x01); // size is only 1
         dataOutputStream.writeByte(0x00); // packet id for ping
         DataInputStream dataInputStream = new DataInputStream(inputStream);
-        int size = readVarInt(dataInputStream); // size of packet
         int id = readVarInt(dataInputStream); // packet id
 
         if (id == -1) {
@@ -143,7 +142,6 @@ public class ServerListPing17 {
         byte[] in = new byte[length];
         dataInputStream.readFully(in); // read json string
         String json = new String(in);
-        // System.out.println(json);
         StatusResponse response = null;
         try {
             response = gson.fromJson(json, StatusResponseOld.class);

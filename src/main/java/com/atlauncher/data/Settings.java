@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,7 +20,6 @@ package com.atlauncher.data;
 import java.awt.Dialog.ModalityType;
 import java.awt.FlowLayout;
 import java.awt.Window;
-import java.awt.event.WindowAdapter;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.EOFException;
@@ -30,65 +29,66 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.Proxy;
 import java.net.Proxy.Type;
 import java.net.URLDecoder;
-import java.text.SimpleDateFormat;
+import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 
 import com.atlauncher.App;
+import com.atlauncher.FileSystem;
 import com.atlauncher.Gsons;
 import com.atlauncher.LogManager;
+import com.atlauncher.Network;
 import com.atlauncher.Update;
+import com.atlauncher.builders.HTMLBuilder;
+import com.atlauncher.data.minecraft.MojangStatus;
 import com.atlauncher.exceptions.InvalidMinecraftVersion;
 import com.atlauncher.exceptions.InvalidPack;
-import com.atlauncher.gui.LauncherConsole;
 import com.atlauncher.gui.components.LauncherBottomBar;
 import com.atlauncher.gui.dialogs.ProgressDialog;
 import com.atlauncher.gui.tabs.InstancesTab;
 import com.atlauncher.gui.tabs.NewsTab;
 import com.atlauncher.gui.tabs.PacksTab;
-import com.atlauncher.thread.LoggingThread;
-import com.atlauncher.utils.HTMLUtils;
-import com.atlauncher.utils.MojangAPIUtils;
+import com.atlauncher.gui.tabs.ServersTab;
+import com.atlauncher.managers.DialogManager;
+import com.atlauncher.network.Analytics;
+import com.atlauncher.network.DownloadPool;
+import com.atlauncher.utils.ATLauncherAPIUtils;
+import com.atlauncher.utils.FileUtils;
+import com.atlauncher.utils.Hashing;
+import com.atlauncher.utils.Java;
+import com.atlauncher.utils.OS;
 import com.atlauncher.utils.Timestamper;
 import com.atlauncher.utils.Utils;
-
 import com.google.gson.JsonIOException;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.reflect.TypeToken;
 
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
+import org.mini2Dx.gettext.GetText;
+
+import net.arikia.dev.drpc.DiscordRPC;
+import okhttp3.OkHttpClient;
 
 /**
  * Settings class for storing all data for the Launcher and the settings of the
@@ -98,7 +98,6 @@ import org.json.simple.parser.ParseException;
  */
 public class Settings {
     // Users Settings
-    private Server server; // Server to use for the Launcher
     private String forgeLoggingLevel; // Logging level to use when running Minecraft with Forge
     private int initialMemory; // Initial RAM to use when launching Minecraft
     private int maximumMemory; // Maximum RAM to use when launching Minecraft
@@ -107,133 +106,94 @@ public class Settings {
     private int windowHeight; // Height of the Minecraft window
     private boolean maximiseMinecraft; // If Minecraft should start maximised
     private boolean saveCustomMods; // If custom mods should be saved between updates/reinstalls
+    private boolean ignoreJavaOnInstanceLaunch; // If Java enforcement on instance launch should be
+                                                // ignored
     private boolean usingCustomJavaPath; // If the user is using a custom java path
     private String javaPath; // Users path to Java
     private String javaParamaters; // Extra Java paramaters when launching Minecraft
-    private boolean advancedBackup; // If advanced backup is enabled
     private boolean sortPacksAlphabetically; // If to sort packs default alphabetically
     private boolean keepLauncherOpen; // If we should close the Launcher after Minecraft has closed
     private boolean enableConsole; // If to show the console by default
     private boolean enableTrayIcon; // If to enable tray icon
+    private boolean enableDiscordIntegration; // If to enable Discord integration
     private boolean enableLeaderboards; // If to enable the leaderboards
     private boolean enableLogs; // If to enable logs
+    private boolean enableAnalytics; // If to enable analytics
     private boolean enableOpenEyeReporting; // If to enable OpenEye reporting
     private boolean enableProxy = false; // If proxy is in use
     private boolean enablePackTags = false;
+    private boolean enableModsBackups; // If mods should be backed up
     private String proxyHost; // The proxies host
     private int proxyPort; // The proxies port
     private String proxyType; // The type of proxy (socks, http)
     private int concurrentConnections; // Number of concurrent connections to open when downloading
-    private int daysOfLogsToKeep; // Number of days of logs to keep
     private Account account; // Account using the Launcher
     private String addedPacks; // The Semi Public packs the user has added to the Launcher
     private Proxy proxy = null; // The proxy object if any
     private String theme; // The theme to use
     private String dateFormat; // The date format to use
     private boolean hideOldJavaWarning; // If the user has hidden the old Java warning
-    private boolean hideJava8Warning; // If the user has hidden the Java 8 warning
+    private boolean hideJava9Warning; // If the user has hidden the Java 8 warning
     private boolean enableServerChecker; // If to enable server checker
     private int serverCheckerWait; // Time to wait in minutes between checking server status
-    // General backup settings
-    private boolean autoBackup; // Whether backups are created on instance close
-    private String lastSelectedSync; // The last service selected for syncing
-    private boolean notifyBackup; // Whether to notify the user on successful backup or restore
-    // Dropbox settings
-    private String dropboxFolderLocation; // Location of dropbox if defined by user
+    private String analyticsClientId;
     // Packs, Instances and Accounts
     private LauncherVersion latestLauncherVersion; // Latest Launcher version
     private List<DownloadableFile> launcherFiles; // Files the Launcher needs to download
-    private List<News> news; // News
+    private List<News> news = new ArrayList<>(); // News
     private Map<String, MinecraftVersion> minecraftVersions; // Minecraft versions
-    private List<Pack> packs; // Packs in the Launcher
-    private List<Instance> instances = new ArrayList<Instance>(); // Users Installed Instances
-    private List<Account> accounts = new ArrayList<Account>(); // Accounts in the Launcher
-    private List<MinecraftServer> checkingServers = new ArrayList<MinecraftServer>();
-    // Directories and Files for the Launcher
-    private File baseDir, backupsDir, configsDir, themesDir, jsonDir, versionsDir, imagesDir, skinsDir, jarsDir,
-            commonConfigsDir, assetsDir, resourcesDir, librariesDir, gameLibrariesDir, loadersDir, languagesDir,
-            downloadsDir, usersDownloadsFolder, instancesDir, serversDir, tempDir, failedDownloadsDir,
-            instancesDataFile, checkingServersFile, userDataFile, propertiesFile, logsDir;
+    public List<Pack> packs = new ArrayList<>(); // Packs in the Launcher
+    public List<Instance> instances = new ArrayList<>(); // Users Installed Instances
+    public List<InstanceV2> instancesV2 = new ArrayList<>(); // Users Installed Instances (new format)
+    public List<Server> servers = new ArrayList<>(); // Users Installed Servers
+    private List<Account> accounts = new ArrayList<>(); // Accounts in the Launcher
+    private List<MinecraftServer> checkingServers = new ArrayList<>();
     // Launcher Settings
     private JFrame parent; // Parent JFrame of the actual Launcher
     private Properties properties = new Properties(); // Properties to store everything in
-    private LauncherConsole console; // The Launcher's Console
-    private List<Server> servers = new ArrayList<Server>(); // Servers for the Launcher
-    private List<Server> triedServers = new ArrayList<Server>(); // Servers tried to connect to
     private InstancesTab instancesPanel; // The instances panel
+    private ServersTab serversPanel; // The instances panel
     private NewsTab newsPanel; // The news panel
     private PacksTab vanillaPacksPanel; // The vanilla packs panel
     private PacksTab featuredPacksPanel; // The featured packs panel
     private PacksTab packsPanel; // The packs panel
     private LauncherBottomBar bottomBar; // The bottom bar
-    private boolean hadPasswordDialog = false; // If the user has seen the password dialog
     private boolean firstTimeRun = false; // If this is the first time the Launcher has been run
-    private boolean offlineMode = false; // If offline mode is enabled
     private Process minecraftProcess = null; // The process minecraft is running on
-    private Server originalServer = null; // Original Server user has saved
     private boolean minecraftLaunched = false; // If Minecraft has been Launched
     private String userAgent = "Mozilla/5.0 (Windows NT 6.2; WOW64) AppleWebKit/537.36 (KHTML, " + ""
             + "like Gecko) Chrome/28.0.1500.72 Safari/537.36";
     private boolean minecraftLoginServerUp = false; // If the Minecraft Login server is up
     private boolean minecraftSessionServerUp = false; // If the Minecraft Session server is up
-    @SuppressWarnings("unused")
-    private DropboxSync dropbox;
     private Timer checkingServersTimer = null; // Timer used for checking servers
 
     public Settings() {
-        setupFiles(); // Setup all the file and directory variables
-        checkFolders(); // Checks the setup of the folders and makes sure they're there
-        clearTempDir(); // Cleans all files in the Temp Dir
         loadStartingProperties(); // Get users Console preference and Java Path
     }
 
-    public void loadConsole() {
-        console = new LauncherConsole();
-        LogManager.start();
-    }
+    public void checkIfWeCanLoad() {
+        if (!Java.isUsingJavaSupportingLetsEncrypt()) {
+            LogManager.warn("You're using an old version of Java that will not work!");
 
-    public void setupFiles() {
-        baseDir = Utils.getCoreGracefully();
-        usersDownloadsFolder = new File(System.getProperty("user.home"), "Downloads");
-        logsDir = new File(baseDir, "Logs");
-        backupsDir = new File(baseDir, "Backups");
-        configsDir = new File(baseDir, "Configs");
-        themesDir = new File(configsDir, "Themes");
-        jsonDir = new File(configsDir, "JSON");
-        versionsDir = new File(configsDir, "Versions");
-        imagesDir = new File(configsDir, "Images");
-        skinsDir = new File(imagesDir, "Skins");
-        jarsDir = new File(configsDir, "Jars");
-        commonConfigsDir = new File(configsDir, "Common");
-        resourcesDir = new File(configsDir, "Resources");
-        assetsDir = new File(baseDir, "assets");
-        librariesDir = new File(configsDir, "Libraries");
-        gameLibrariesDir = new File(baseDir, "libraries");
-        loadersDir = new File(baseDir, "loaders");
-        languagesDir = new File(configsDir, "Languages");
-        downloadsDir = new File(baseDir, "Downloads");
-        instancesDir = new File(baseDir, "Instances");
-        serversDir = new File(baseDir, "Servers");
-        tempDir = new File(baseDir, "Temp");
-        failedDownloadsDir = new File(baseDir, "FailedDownloads");
-        instancesDataFile = new File(configsDir, "instancesdata");
-        checkingServersFile = new File(configsDir, "checkingservers.json");
-        userDataFile = new File(configsDir, "userdata");
-        propertiesFile = new File(configsDir, Constants.LAUNCHER_NAME + ".conf");
+            DialogManager.optionDialog().setTitle(GetText.tr("Unsupported Java Version"))
+                    .setContent(new HTMLBuilder().center().text(GetText.tr(
+                            "You're using an unsupported version of Java. You need to upgrade your Java to at minimum Java 8 version 101.<br/><br/>The launcher will not start until you do this.<br/><br/>If you're seeing this message even after installing a newer version, you may need to uninstall the old version first.<br/><br/>Click ok to open the Java download page and close the launcher."))
+                            .build())
+                    .addOption(GetText.tr("Ok")).setType(DialogManager.ERROR).show();
+
+            OS.openWebBrowser("https://atl.pw/java8download");
+            System.exit(0);
+        }
     }
 
     public void loadEverything() {
-        if (App.forceOfflineMode) {
-            this.offlineMode = true;
-        }
-
-        setupServers(); // Setup the servers available to use in the Launcher
-        loadServerProperty(false); // Get users Server preference
         if (hasUpdatedFiles()) {
             downloadUpdatedFiles(); // Downloads updated files on the server
         }
 
         checkForLauncherUpdate();
+
+        addExecutableBitToTools();
 
         loadNews(); // Load the news
 
@@ -245,6 +205,8 @@ public class Settings {
 
         loadInstances(); // Load the users installed Instances
 
+        loadServers(); // Load the users installed servers
+
         loadAccounts(); // Load the saved Accounts
 
         loadCheckingServers(); // Load the saved servers we're checking with the tool
@@ -255,60 +217,55 @@ public class Settings {
             checkForValidJavaPath(true); // Checks for a valid Java path
         }
 
-        console.setupLanguage(); // Setup language on the console
-
-        clearOldLogs(); // Clear all the old logs out
-
-        checkResources(); // Check for new format of resources
-
-        checkAccountUUIDs(); // Check for accounts UUID's and add them if necessary
-
-        changeInstanceUserLocks(); // Changes any instances user locks to UUIDs if available
-
         checkAccountsForNameChanges(); // Check account for username changes
 
-        LogManager.debug("Checking for access to master server");
-        OUTER: for (Pack pack : this.packs) {
-            if (pack.isTester()) {
-                for (Server server : this.servers) {
-                    if (server.getName().equals("Master Server (Testing Only)")) {
-                        server.setUserSelectable(true);
-                        LogManager.debug("Access to master server granted");
-                        break OUTER; // Don't need to check anymore so break the outer loop
-                    }
-                }
-            }
-        }
-        LogManager.debug("Finished checking for access to master server");
-
-        loadServerProperty(true); // Get users Server preference
-
-        if (Utils.isWindows() && !Utils.is64Bit() && Utils.isWindows64Bit()) {
+        if (OS.isWindows() && !OS.is64Bit() && OS.isWindows64Bit()) {
             LogManager.warn("You're using 32 bit Java on a 64 bit Windows install!");
-            String[] options = { Language.INSTANCE.localize("common.yes"), Language.INSTANCE.localize("common.no") };
-            int ret = JOptionPane.showOptionDialog(App.settings.getParent(),
-                    HTMLUtils.centerParagraph(
-                            Language.INSTANCE.localizeWithReplace("settings.running32bit", "<br/><br/>")),
-                    Language.INSTANCE.localize("settings.running32bittitle"), JOptionPane.DEFAULT_OPTION,
-                    JOptionPane.ERROR_MESSAGE, null, options, options[0]);
+
+            int ret = DialogManager.yesNoDialog().setTitle(GetText.tr("Running 32 Bit Java on 64 Bit Windows"))
+                    .setContent(new HTMLBuilder().center().text(GetText.tr(
+                            "We have detected that you're running 64 bit Windows but not 64 bit Java.<br/><br/>This will cause severe issues playing all packs if not fixed.<br/><br/>Do you want to close the launcher and learn how to fix this issue now?"))
+                            .build())
+                    .setType(DialogManager.ERROR).show();
+
             if (ret == 0) {
-                Utils.openBrowser("http://www.atlauncher.com/help/32bit/");
+                OS.openWebBrowser("https://www.atlauncher.com/help/32bit/");
                 System.exit(0);
             }
         }
 
-        if (!Utils.isJava7OrAbove(true) && !this.hideOldJavaWarning) {
-            LogManager.warn("You're using an old unsupported version of Java (Java 6 or older)!");
-            String[] options = { Language.INSTANCE.localize("common.download"),
-                    Language.INSTANCE.localize("common" + ".ok"),
-                    Language.INSTANCE.localize("instance" + "" + ".dontremindmeagain") };
-            int ret = JOptionPane.showOptionDialog(App.settings.getParent(),
-                    HTMLUtils.centerParagraph(
-                            Language.INSTANCE.localizeWithReplace("settings.unsupportedjava", "<br/><br/>")),
-                    Language.INSTANCE.localize("settings.unsupportedjavatitle"), JOptionPane.DEFAULT_OPTION,
-                    JOptionPane.ERROR_MESSAGE, null, options, options[0]);
+        if (Java.isMinecraftJavaNewerThanJava8() && !this.hideJava9Warning) {
+            LogManager.warn("You're using a newer version of Java than Java 8! Modpacks may not launch!");
+
+            int ret = DialogManager.optionDialog()
+                    .setTitle(GetText.tr("Warning! You may not be able to play Minecraft"))
+                    .setContent(new HTMLBuilder().center().text(GetText.tr(
+                            "You're using Java 9 or newer! Older modpacks may not work.<br/><br/>If you have issues playing some packs, you may need to install Java 8 and set it to be used in the launchers java settings"))
+                            .build())
+                    .addOption(GetText.tr("Download"), true).addOption(GetText.tr("Ok"))
+                    .addOption(GetText.tr("Don't Remind Me Again")).setType(DialogManager.WARNING).show();
+
             if (ret == 0) {
-                Utils.openBrowser("http://atl.pw/java7download");
+                OS.openWebBrowser("https://atl.pw/java8download");
+                System.exit(0);
+            } else if (ret == 2) {
+                this.hideJava9Warning = true;
+                this.saveProperties();
+            }
+        }
+
+        if (!Java.isJava7OrAbove(true) && !this.hideOldJavaWarning) {
+            LogManager.warn("You're using an old unsupported version of Java (Java 7 or older)!");
+
+            int ret = DialogManager.optionDialog().setTitle(GetText.tr("Unsupported Java Version"))
+                    .setContent(new HTMLBuilder().center().text(GetText.tr(
+                            "You're using an unsupported version of Java. You should upgrade your Java to at minimum Java 7.<br/><br/>Without Java 7 some mods will refuse to load meaning you cannot play.<br/><br/>Click Download to go to the Java downloads page"))
+                            .build())
+                    .addOption(GetText.tr("Download"), true).addOption(GetText.tr("Ok"))
+                    .addOption(GetText.tr("Don't Remind Me Again")).setType(DialogManager.WARNING).show();
+
+            if (ret == 0) {
+                OS.openWebBrowser("https://atl.pw/java8download");
                 System.exit(0);
             } else if (ret == 2) {
                 this.hideOldJavaWarning = true;
@@ -316,16 +273,16 @@ public class Settings {
             }
         }
 
-        if (this.advancedBackup) {
-            dropbox = new DropboxSync();
-        }
-
-        if (!this.hadPasswordDialog) {
-            checkAccounts(); // Check accounts with stored passwords
-        }
-
         if (this.enableServerChecker) {
             this.startCheckingServers();
+        }
+
+        if (this.enableLogs) {
+            App.TASKPOOL.execute(ATLauncherAPIUtils::postSystemInfo);
+
+            if (this.enableAnalytics) {
+                Analytics.startSession();
+            }
         }
     }
 
@@ -349,11 +306,11 @@ public class Settings {
 
     public void checkForValidJavaPath(boolean save) {
         File java = new File(App.settings.getJavaPath(),
-                "bin" + File.separator + "java" + (Utils.isWindows() ? ".exe" : ""));
+                "bin" + File.separator + "java" + (OS.isWindows() ? ".exe" : ""));
 
         if (!java.exists()) {
             LogManager.error("Custom Java Path Is Incorrect! Defaulting to valid value!");
-            this.setJavaPath(Utils.getJavaHome());
+            this.setJavaPath(OS.getDefaultJavaPath());
 
             if (save) {
                 this.saveProperties();
@@ -381,212 +338,19 @@ public class Settings {
         }
     }
 
-    public void checkAccounts() {
-        boolean matches = false;
-        if (this.accounts != null || this.accounts.size() >= 1) {
-            for (Account account : this.accounts) {
-                if (account.isRemembered()) {
-                    matches = true;
-                }
-            }
-        }
-        if (matches) {
-            String[] options = { Language.INSTANCE.localize("common.ok"),
-                    Language.INSTANCE.localize("account" + "" + ".removepasswords") };
-            int ret = JOptionPane.showOptionDialog(App.settings.getParent(),
-                    HTMLUtils
-                            .centerParagraph(Language.INSTANCE.localizeWithReplace("account.securitywarning", "<br/>")),
-                    Language.INSTANCE.localize("account.securitywarningtitle"), JOptionPane.DEFAULT_OPTION,
-                    JOptionPane.ERROR_MESSAGE, null, options, options[0]);
-            if (ret == 1) {
-                for (Account account : this.accounts) {
-                    if (account.isRemembered()) {
-                        account.setRemember(false);
-                    }
-                }
-                this.saveAccounts();
-            }
-        }
-        this.saveProperties();
-    }
-
-    public void clearOldLogs() {
-        LogManager.debug("Clearing out old logs");
-
-        File logFile1 = new File(getBaseDir(), Constants.LAUNCHER_NAME + "-Log-1.txt");
-        File logFile2 = new File(getBaseDir(), Constants.LAUNCHER_NAME + "-Log-2.txt");
-        File logFile3 = new File(getBaseDir(), Constants.LAUNCHER_NAME + "-Log-3.txt");
-
-        if (logFile3.exists()) {
-            Utils.delete(logFile3);
-        }
-
-        if (logFile2.exists()) {
-            Utils.delete(logFile2);
-        }
-
-        if (logFile1.exists()) {
-            Utils.delete(logFile1);
-        }
-
-        Date toDeleteAfter = new Date();
-
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTime(toDeleteAfter);
-        calendar.add(Calendar.DATE, -(getDaysOfLogsToKeep()));
-        toDeleteAfter = calendar.getTime();
-
-        for (File file : this.logsDir.listFiles(Utils.getLogsFileFilter())) {
-            try {
-                Date date = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss")
-                        .parse(file.getName().replace(Constants.LAUNCHER_NAME + "-Log_", "").replace(".log", ""));
-
-                if (date.before(toDeleteAfter)) {
-                    Utils.delete(file);
-                    LogManager.debug("Deleting log file " + file.getName());
-                }
-            } catch (java.text.ParseException e) {
-                LogManager.error("Invalid log file " + file.getName());
-            }
-        }
-
-        LogManager.debug("Finished clearing out old logs");
-    }
-
-    public void clearAllLogs() {
-        File logFile1 = new File(getBaseDir(), Constants.LAUNCHER_NAME + "-Log-1.txt");
-        File logFile2 = new File(getBaseDir(), Constants.LAUNCHER_NAME + "-Log-2.txt");
-        File logFile3 = new File(getBaseDir(), Constants.LAUNCHER_NAME + "-Log-3.txt");
-
-        if (logFile3.exists()) {
-            Utils.delete(logFile3);
-        }
-
-        if (logFile2.exists()) {
-            Utils.delete(logFile2);
-        }
-
-        if (logFile1.exists()) {
-            Utils.delete(logFile1);
-        }
-
-        for (File file : this.logsDir.listFiles(Utils.getLogsFileFilter())) {
-            if (file.getName().equals(LoggingThread.filename)) {
-                continue; // Skip current log
-            }
-
-            Utils.delete(file);
-        }
-    }
-
-    public void checkResources() {
-        LogManager.debug("Checking if using old format of resources");
-        // moving from Resources to more vanilla 'assets' folder
-        if (this.resourcesDir.exists() && this.resourcesDir.isDirectory()) {
-            final ProgressDialog dialog = new ProgressDialog(
-                    Language.INSTANCE.localize("settings" + "" + ".rearrangingresources"), 0,
-                    Language.INSTANCE.localize("settings.rearrangingresources"), null);
-            Thread thread = new Thread() {
-                @Override
-                public void run() {
-                    Utils.moveDirectory(new File(getResourcesDir(), "indexes"), new File(assetsDir, "indexes"));
-                    Utils.moveDirectory(new File(getResourcesDir(), "objects"), new File(assetsDir, "objects"));
-                    Utils.moveDirectory(new File(getResourcesDir(), "virtual"), new File(assetsDir, "virtual"));
-
-                    Utils.delete(getResourcesDir());
-
-                    dialog.close();
-                }
-            };
-            dialog.addThread(thread);
-            dialog.start();
-        }
-        LogManager.debug("Finished checking if using old format of resources");
-    }
-
-    public void checkAccountUUIDs() {
-        LogManager.debug("Checking account UUID's");
-        LogManager.info("Checking account UUID's!");
-        for (Account account : this.accounts) {
-            if (account.isUUIDNull()) {
-                account.setUUID(MojangAPIUtils.getUUID(account.getMinecraftUsername()));
-                this.saveAccounts();
-            }
-        }
-        LogManager.debug("Finished checking account UUID's");
-    }
-
-    public void changeInstanceUserLocks() {
-        LogManager.debug("Changing instances user locks to UUID's");
-
-        boolean wereChanges = false;
-
-        for (Instance instance : this.instances) {
-            if (instance.getInstalledBy() != null) {
-                boolean found = false;
-
-                for (Account account : this.accounts) {
-                    // This is the user who installed this so switch to their UUID
-                    if (account.getMinecraftUsername().equalsIgnoreCase(instance.getInstalledBy())) {
-                        found = true;
-                        wereChanges = true;
-
-                        instance.removeInstalledBy();
-
-                        // If the accounts UUID is null for whatever reason, don't set the lock
-                        if (!account.isUUIDNull()) {
-                            instance.setUserLock(account.getUUIDNoDashes());
-                        }
-                        break;
-                    }
-                }
-
-                // If there were no accounts with that username, we remove the lock and old
-                // installed by
-                if (!found) {
-                    wereChanges = true;
-
-                    instance.removeInstalledBy();
-                    instance.removeUserLock();
-                }
-            }
-        }
-
-        if (wereChanges) {
-            this.saveAccounts();
-            this.saveInstances();
-        }
-
-        LogManager.debug("Finished changing instances user locks to UUID's");
-    }
-
     public void checkMojangStatus() {
-        JSONParser parser = new JSONParser();
         try {
-            Downloadable download = new Downloadable("http://status.mojang.com/check", false);
-            String response = download.getContents();
-            if (response == null) {
+            MojangStatus status = com.atlauncher.network.Download.build().setUrl("https://status.mojang.com/check")
+                    .asClass(MojangStatus.class);
+
+            if (status == null) {
                 minecraftSessionServerUp = false;
                 minecraftLoginServerUp = false;
-                return;
             }
-            Object obj = parser.parse(response);
-            JSONArray jsonObject = (JSONArray) obj;
-            Iterator<JSONObject> iterator = jsonObject.iterator();
-            while (iterator.hasNext()) {
-                JSONObject object = iterator.next();
-                if (object.containsKey("authserver.mojang.com")) {
-                    if (((String) object.get("authserver.mojang.com")).equalsIgnoreCase("green")) {
-                        minecraftLoginServerUp = true;
-                    }
-                } else if (object.containsKey("session.minecraft.net")) {
-                    if (((String) object.get("session.minecraft.net")).equalsIgnoreCase("green")) {
-                        minecraftSessionServerUp = true;
-                    }
-                }
-            }
-        } catch (ParseException e) {
-            LogManager.logStackTrace(e);
+
+            minecraftLoginServerUp = status.isAuthServerUp();
+            minecraftSessionServerUp = status.isSessionServerUp();
+        } catch (Exception e) {
             minecraftSessionServerUp = false;
             minecraftLoginServerUp = false;
         }
@@ -604,13 +368,9 @@ public class Settings {
 
     public boolean launcherHasUpdate() {
         try {
-            this.latestLauncherVersion = Gsons.DEFAULT.fromJson(new FileReader(new File(this.jsonDir, "version.json")),
-                    LauncherVersion.class);
-        } catch (JsonSyntaxException e) {
-            LogManager.logStackTrace("Exception when loading latest launcher version!", e);
-        } catch (JsonIOException e) {
-            LogManager.logStackTrace("Exception when loading latest launcher version!", e);
-        } catch (FileNotFoundException e) {
+            this.latestLauncherVersion = Gsons.DEFAULT
+                    .fromJson(new FileReader(FileSystem.JSON.resolve("version.json").toFile()), LauncherVersion.class);
+        } catch (JsonSyntaxException | FileNotFoundException | JsonIOException e) {
             LogManager.logStackTrace("Exception when loading latest launcher version!", e);
         }
 
@@ -629,21 +389,47 @@ public class Settings {
             } else {
                 toget = "jar";
             }
-            File newFile = new File(getTempDir(), saveAs);
+            File newFile = FileSystem.TEMP.resolve(saveAs).toFile();
             LogManager.info("Downloading Launcher Update");
-            Downloadable update = new Downloadable(Constants.LAUNCHER_NAME + "." + toget, newFile, null, null, true);
-            update.download(false);
-            runUpdate(path, newFile.getAbsolutePath());
+            Analytics.sendEvent("Update", "Launcher");
+
+            ProgressDialog progressDialog = new ProgressDialog(GetText.tr("Downloading Launcher Update"), 1,
+                    GetText.tr("Downloading Launcher Update"));
+            progressDialog.addThread(new Thread(() -> {
+                com.atlauncher.network.Download download = com.atlauncher.network.Download.build()
+                        .setUrl(String.format("%s/%s.%s", Constants.DOWNLOAD_SERVER, Constants.LAUNCHER_NAME, toget))
+                        .withHttpClient(Network.createProgressClient(progressDialog)).downloadTo(newFile.toPath());
+
+                progressDialog.setTotalBytes(download.getFilesize());
+
+                try {
+                    download.downloadFile();
+                } catch (IOException e) {
+                    LogManager.logStackTrace("Failed to download update", e);
+                    progressDialog.setReturnValue(false);
+                    progressDialog.close();
+                    return;
+                }
+
+                progressDialog.setReturnValue(true);
+                progressDialog.doneTask();
+                progressDialog.close();
+            }));
+            progressDialog.start();
+
+            if ((Boolean) progressDialog.getReturnValue()) {
+                runUpdate(path, newFile.getAbsolutePath());
+            }
         } catch (IOException e) {
             LogManager.logStackTrace(e);
         }
     }
 
     public void runUpdate(String currentPath, String temporaryUpdatePath) {
-        List<String> arguments = new ArrayList<String>();
+        List<String> arguments = new ArrayList<>();
 
         String path = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
-        if (Utils.isWindows()) {
+        if (OS.isWindows()) {
             path += "w";
         }
         arguments.add(path);
@@ -667,71 +453,57 @@ public class Settings {
         System.exit(0);
     }
 
-    private void getFileHashes() {
-        this.launcherFiles = null;
-        Downloadable download = new Downloadable("launcher/json/hashes.json", true);
-        java.lang.reflect.Type type = new TypeToken<List<DownloadableFile>>() {
-        }.getType();
-
-        String contents = download.getContents();
-
-        try {
-            this.launcherFiles = Gsons.DEFAULT.fromJson(contents, type);
-        } catch (Exception e) {
-            String result = Utils.uploadPaste(Constants.LAUNCHER_NAME + " Error", contents);
-            LogManager.logStackTrace("Error loading in file hashes! See error details at " + result, e);
-        }
-    }
-
     /**
-     * This checks the servers hashes.json file and gets the files that the Launcher
+     * This checks the servers files.json file and gets the files that the Launcher
      * needs to have
      */
-    private ArrayList<Downloadable> getLauncherFiles() {
-        getFileHashes(); // Get File Hashes
+    private List<com.atlauncher.network.Download> getLauncherFiles() {
         if (this.launcherFiles == null) {
-            this.offlineMode = true;
+            java.lang.reflect.Type type = new TypeToken<List<DownloadableFile>>() {
+            }.getType();
+
+            try {
+                this.launcherFiles = com.atlauncher.network.Download.build().cached()
+                        .setUrl(String.format("%s/launcher/json/files.json", Constants.DOWNLOAD_SERVER)).asType(type);
+            } catch (Exception e) {
+                LogManager.logStackTrace("Error loading in file hashes!", e);
+                return null;
+            }
+        }
+
+        if (this.launcherFiles == null) {
             return null;
         }
-        ArrayList<Downloadable> downloads = new ArrayList<Downloadable>();
-        for (DownloadableFile file : this.launcherFiles) {
-            if (file.isLauncher()) {
-                continue;
-            }
-            downloads.add(file.getDownloadable());
-        }
-        return downloads;
+
+        return this.launcherFiles.stream().filter(file -> !file.isLauncher() && !file.isFiles())
+                .map(DownloadableFile::getDownload).collect(Collectors.toList());
     }
 
     public void downloadUpdatedFiles() {
-        ArrayList<Downloadable> downloads = getLauncherFiles();
-        if (downloads != null) {
-            ExecutorService executor = Executors.newFixedThreadPool(this.concurrentConnections);
-            for (final Downloadable download : downloads) {
-                executor.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (download.needToDownload()) {
-                            LogManager.info("Downloading Launcher File " + download.getFile().getName());
-                            download.download(false);
-                        }
-                    }
-                });
-            }
-            executor.shutdown();
-            while (!executor.isTerminated()) {
-            }
-        }
+        ProgressDialog progressDialog = new ProgressDialog(GetText.tr("Downloading Updates"), 1,
+                GetText.tr("Downloading Updates"));
+        progressDialog.addThread(new Thread(() -> {
+            DownloadPool pool = new DownloadPool();
+            OkHttpClient httpClient = Network.createProgressClient(progressDialog);
+            pool.addAll(
+                    getLauncherFiles().stream().map(dl -> dl.withHttpClient(httpClient)).collect(Collectors.toList()));
+            DownloadPool smallPool = pool.downsize();
+
+            progressDialog.setTotalBytes(smallPool.totalSize());
+
+            pool.downloadAll();
+            progressDialog.doneTask();
+            progressDialog.close();
+        }));
+        progressDialog.start();
 
         LogManager.info("Finished downloading updated files!");
+    }
 
-        if (Language.INSTANCE.getCurrent() != null) {
-            try {
-                Language.INSTANCE.reload(Language.INSTANCE.getCurrent());
-            } catch (IOException e) {
-                LogManager.logStackTrace("Couldn't reload langauge " + Language.INSTANCE.getCurrent(), e);
-            }
-        }
+    public boolean checkForUpdatedFiles() {
+        this.launcherFiles = null;
+
+        return hasUpdatedFiles();
     }
 
     /**
@@ -739,23 +511,14 @@ public class Settings {
      * differ from what the user has
      */
     public boolean hasUpdatedFiles() {
-        if (isInOfflineMode()) {
-            return false;
-        }
         LogManager.info("Checking for updated files!");
-        ArrayList<Downloadable> downloads = getLauncherFiles();
+        List<com.atlauncher.network.Download> downloads = getLauncherFiles();
+
         if (downloads == null) {
-            this.offlineMode = true;
             return false;
         }
-        for (Downloadable download : downloads) {
-            if (download.needToDownload()) {
-                LogManager.info("Updates found!");
-                return true; // 1 file needs to be updated so there is updated files
-            }
-        }
-        LogManager.info("No updates found!");
-        return false; // No updates
+
+        return downloads.stream().anyMatch(com.atlauncher.network.Download::needToDownload);
     }
 
     public void reloadLauncherData() {
@@ -765,27 +528,25 @@ public class Settings {
         dialog.setLocationRelativeTo(App.settings.getParent());
         dialog.setLayout(new FlowLayout());
         dialog.setResizable(false);
-        dialog.add(new JLabel("Updating Launcher... Please Wait"));
-        App.TASKPOOL.execute(new Runnable() {
-
-            @Override
-            public void run() {
-                if (hasUpdatedFiles()) {
-                    downloadUpdatedFiles(); // Downloads updated files on the server
-                }
-                checkForLauncherUpdate();
-                loadNews(); // Load the news
-                reloadNewsPanel(); // Reload news panel
-                loadPacks(); // Load the Packs available in the Launcher
-                reloadVanillaPacksPanel(); // Reload packs panel
-                reloadFeaturedPacksPanel(); // Reload packs panel
-                reloadPacksPanel(); // Reload packs panel
-                loadUsers(); // Load the Testers and Allowed Players for the packs
-                loadInstances(); // Load the users installed Instances
-                reloadInstancesPanel(); // Reload instances panel
-                dialog.setVisible(false); // Remove the dialog
-                dialog.dispose(); // Dispose the dialog
+        dialog.add(new JLabel(GetText.tr("Updating Launcher. Please Wait")));
+        App.TASKPOOL.execute(() -> {
+            if (hasUpdatedFiles()) {
+                downloadUpdatedFiles(); // Downloads updated files on the server
             }
+            checkForLauncherUpdate();
+            addExecutableBitToTools();
+            loadNews(); // Load the news
+            reloadNewsPanel(); // Reload news panel
+            loadPacks(); // Load the Packs available in the Launcher
+            reloadVanillaPacksPanel(); // Reload packs panel
+            reloadFeaturedPacksPanel(); // Reload packs panel
+            reloadPacksPanel(); // Reload packs panel
+            loadUsers(); // Load the Testers and Allowed Players for the packs
+            loadInstances(); // Load the users installed Instances
+            reloadInstancesPanel(); // Reload instances panel
+            reloadServersPanel(); // Reload instances panel
+            dialog.setVisible(false); // Remove the dialog
+            dialog.dispose(); // Dispose the dialog
         });
         dialog.setVisible(true);
     }
@@ -800,277 +561,30 @@ public class Settings {
             if (!App.wasUpdated) {
                 downloadUpdate(); // Update the Launcher
             } else {
-                String[] options = { "Ok" };
-                JOptionPane.showOptionDialog(App.settings.getParent(),
-                        HTMLUtils.centerParagraph("Update failed. " + "Please click Ok to close "
-                                + "the launcher and open up the downloads " + "page.<br/><br/>Download "
-                                + "the update and replace the old " + Constants.LAUNCHER_NAME + " " + "file."),
-                        "Update Failed!", JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE, null, options,
-                        options[0]);
-                Utils.openBrowser("http://www.atlauncher.com/downloads/");
+                DialogManager.okDialog().setTitle("Update Failed!")
+                        .setContent(new HTMLBuilder().center()
+                                .text(GetText.tr("Update failed. Please click Ok to close "
+                                        + "the launcher and open up the downloads page.<br/><br/>Download "
+                                        + "the update and replace the old " + Constants.LAUNCHER_NAME + " file."))
+                                .build())
+                        .setType(DialogManager.ERROR).show();
+                OS.openWebBrowser("https://www.atlauncher.com/downloads/");
                 System.exit(0);
             }
         }
         LogManager.debug("Finished checking for launcher update");
     }
 
-    /**
-     * Checks the directory to make sure all the necessary folders are there
-     */
-    private void checkFolders() {
-        File[] files = { backupsDir, configsDir, themesDir, jsonDir, commonConfigsDir, imagesDir, skinsDir, jarsDir,
-                assetsDir, librariesDir, gameLibrariesDir, loadersDir, languagesDir, downloadsDir, instancesDir,
-                serversDir, tempDir, failedDownloadsDir, logsDir };
-        for (File file : files) {
-            if (!file.exists()) {
-                file.mkdir();
-            }
-            if (!file.isDirectory()) {
-                if (file.delete()) {
-                    file.mkdir();
+    private void addExecutableBitToTools() {
+        File[] files = FileSystem.TOOLS.toFile().listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (!file.canExecute()) {
+                    LogManager.info("Executable bit being set on " + file.getName());
+                    file.setExecutable(true);
                 }
-
             }
         }
-    }
-
-    /**
-     * Returns the base directory
-     *
-     * @return File object for the base directory
-     */
-    public File getBaseDir() {
-        return this.baseDir;
-    }
-
-    /**
-     * Returns the backups directory
-     *
-     * @return File object for the backups directory
-     */
-    public File getBackupsDir() {
-        return this.backupsDir;
-    }
-
-    /**
-     * Returns the configs directory
-     *
-     * @return File object for the configs directory
-     */
-    public File getConfigsDir() {
-        return this.configsDir;
-    }
-
-    /**
-     * Returns the themes directory
-     *
-     * @return File object for the themes directory
-     */
-    public File getThemesDir() {
-        return this.themesDir;
-    }
-
-    /**
-     * Returns the JSON directory
-     *
-     * @return File object for the JSON directory
-     */
-    public File getJSONDir() {
-        return this.jsonDir;
-    }
-
-    /**
-     * Returns the Versions directory
-     *
-     * @return File object for the Versions directory
-     */
-    public File getVersionsDir() {
-        return this.versionsDir;
-    }
-
-    /**
-     * Returns the common configs directory
-     *
-     * @return File object for the common configs directory
-     */
-    public File getCommonConfigsDir() {
-        return this.commonConfigsDir;
-    }
-
-    /**
-     * Returns the images directory
-     *
-     * @return File object for the images directory
-     */
-    public File getImagesDir() {
-        return this.imagesDir;
-    }
-
-    /**
-     * Returns the skins directory
-     *
-     * @return File object for the skins directory
-     */
-    public File getSkinsDir() {
-        return this.skinsDir;
-    }
-
-    /**
-     * Returns the jars directory
-     *
-     * @return File object for the jars directory
-     */
-    public File getJarsDir() {
-        return this.jarsDir;
-    }
-
-    /**
-     * Returns the resources directory
-     *
-     * @return File object for the resources directory
-     */
-    public File getResourcesDir() {
-        return this.resourcesDir;
-    }
-
-    /**
-     * Returns the assets directory
-     *
-     * @return File object for the resources directory
-     */
-    public File getAssetsDir() {
-        return this.assetsDir;
-    }
-
-    public File getVirtualAssetsDir() {
-        return new File(this.assetsDir, "virtual");
-    }
-
-    public File getObjectsAssetsDir() {
-        return new File(this.assetsDir, "objects");
-    }
-
-    public File getLegacyVirtualAssetsDir() {
-        return new File(getVirtualAssetsDir(), "legacy");
-    }
-
-    /**
-     * Returns the libraries directory
-     *
-     * @return File object for the libraries directory
-     */
-    public File getLibrariesDir() {
-        return this.librariesDir;
-    }
-
-    /**
-     * Returns the libraries directory for Minecraft
-     *
-     * @return File object for the libraries directory for Minecraft
-     */
-    public File getGameLibrariesDir() {
-        return this.gameLibrariesDir;
-    }
-
-    /**
-     * Returns the loaders directory
-     *
-     * @return File object for the loaders directory
-     */
-    public File getLoadersDir() {
-        return this.loadersDir;
-    }
-
-    /**
-     * Returns the languages directory
-     *
-     * @return File object for the languages directory
-     */
-    public File getLanguagesDir() {
-        return this.languagesDir;
-    }
-
-    /**
-     * Returns the downloads directory
-     *
-     * @return File object for the downloads directory
-     */
-    public File getDownloadsDir() {
-        return this.downloadsDir;
-    }
-
-    /**
-     * Returns the downloads directory for the user
-     *
-     * @return File object for the downloads directory for the users account
-     */
-    public File getUsersDownloadsDir() {
-        return this.usersDownloadsFolder;
-    }
-
-    /**
-     * Returns the instances directory
-     *
-     * @return File object for the instances directory
-     */
-    public File getInstancesDir() {
-        return this.instancesDir;
-    }
-
-    /**
-     * Returns the servers directory
-     *
-     * @return File object for the servers directory
-     */
-    public File getServersDir() {
-        return this.serversDir;
-    }
-
-    /**
-     * Returns the temp directory
-     *
-     * @return File object for the temp directory
-     */
-    public File getTempDir() {
-        return this.tempDir;
-    }
-
-    public File getFailedDownloadsDir() {
-        return this.failedDownloadsDir;
-    }
-
-    /**
-     * Returns the logs directory
-     *
-     * @return File object for the logs directory
-     */
-    public File getLogsDir() {
-        return this.logsDir;
-    }
-
-    /**
-     * Deletes all files in the Temp directory
-     */
-    public void clearTempDir() {
-        Utils.deleteContents(getTempDir());
-    }
-
-    /**
-     * Returns the instancesdata file
-     *
-     * @return File object for the instancesdata file
-     */
-    public File getInstancesDataFile() {
-        return instancesDataFile;
-    }
-
-    /**
-     * Returns the checkingservers file
-     *
-     * @return File object for the checkingservers file
-     */
-    public File getCheckingServersFile() {
-        return checkingServersFile;
     }
 
     /**
@@ -1083,51 +597,28 @@ public class Settings {
     }
 
     /**
-     * Load the users Server preference from file
-     */
-    public void loadServerProperty(boolean userSelectableOnly) {
-        LogManager.debug("Loading server to use");
-        try {
-            this.properties.load(new FileInputStream(propertiesFile));
-            String serv = properties.getProperty("server", "Auto");
-            if (isServerByName(serv)) {
-                if (!userSelectableOnly || (userSelectableOnly && server.isUserSelectable())) {
-                    this.server = getServerByName(serv);
-                    this.originalServer = this.server;
-                }
-            }
-            if (this.server == null) {
-                LogManager.warn("Server " + serv + " is invalid");
-                this.server = getServerByName("Auto"); // Server not found, use default of Auto
-                this.originalServer = this.server;
-            }
-        } catch (FileNotFoundException e) {
-            LogManager.logStackTrace(e);
-        } catch (IOException e) {
-            LogManager.logStackTrace(e);
-        }
-        LogManager.debug("Finished loading server to use");
-    }
-
-    /**
      * Load the users Console preference from file
      */
     public void loadStartingProperties() {
         try {
-            if (!propertiesFile.exists()) {
-                propertiesFile.createNewFile();
+            if (!Files.exists(FileSystem.LAUNCHER_CONFIG)) {
+                if (!Files.isDirectory(FileSystem.CONFIGS)) {
+                    Files.createDirectories(FileSystem.CONFIGS);
+                }
+
+                Files.createFile(FileSystem.LAUNCHER_CONFIG);
             }
         } catch (IOException e) {
-            String[] options = { "OK" };
-            JOptionPane.showOptionDialog(null,
-                    HTMLUtils.centerParagraph("Cannot create the config file"
-                            + ".<br/><br/>Make sure you're running the Launcher from somewhere with<br/>write"
-                            + " permissions for your user account such as your Home/Users folder or desktop."),
-                    "Warning", JOptionPane.DEFAULT_OPTION, JOptionPane.ERROR_MESSAGE, null, options, options[0]);
+            DialogManager.okDialog().setTitle("Error!").setContent(GetText.tr("Cannot create the config file"))
+                    .setContent(new HTMLBuilder().center()
+                            .text(GetText.tr("Make sure you're running the Launcher from somewhere with write"
+                                    + " permissions for your user account such as your Home/Users folder or desktop."))
+                            .build())
+                    .setType(DialogManager.ERROR).show();
             System.exit(0);
         }
         try {
-            this.properties.load(new FileInputStream(propertiesFile));
+            this.properties.load(new FileInputStream(FileSystem.LAUNCHER_CONFIG.toFile()));
             this.theme = properties.getProperty("theme", Constants.LAUNCHER_NAME);
             this.dateFormat = properties.getProperty("dateformat", "dd/M/yyy");
             if (!this.dateFormat.equalsIgnoreCase("dd/M/yyy") && !this.dateFormat.equalsIgnoreCase("M/dd/yyy")
@@ -1137,17 +628,11 @@ public class Settings {
             this.enablePackTags = Boolean.parseBoolean(properties.getProperty("enablepacktags", "false"));
             this.enableConsole = Boolean.parseBoolean(properties.getProperty("enableconsole", "true"));
             this.enableTrayIcon = Boolean.parseBoolean(properties.getProperty("enabletrayicon", "true"));
-            if (!properties.containsKey("usingcustomjavapath")) {
-                this.usingCustomJavaPath = false;
-                this.javaPath = Utils.getJavaHome();
-            } else {
-                this.usingCustomJavaPath = Boolean.parseBoolean(properties.getProperty("usingcustomjavapath", "false"));
-                if (isUsingCustomJavaPath()) {
-                    this.javaPath = properties.getProperty("javapath", Utils.getJavaHome());
-                } else {
-                    this.javaPath = Utils.getJavaHome();
-                }
-            }
+            this.enableDiscordIntegration = Boolean
+                    .parseBoolean(properties.getProperty("enablediscordintegration", "true"));
+
+            String lang = properties.getProperty("language", "English");
+            Language.setLanguage(lang);
 
             this.enableProxy = Boolean.parseBoolean(properties.getProperty("enableproxy", "false"));
 
@@ -1174,15 +659,28 @@ public class Settings {
             if (this.concurrentConnections < 1) {
                 this.concurrentConnections = 8;
             }
-
-            this.daysOfLogsToKeep = Integer.parseInt(properties.getProperty("daysoflogstokeep", "7"));
-            if (this.daysOfLogsToKeep < 1 || this.daysOfLogsToKeep > 30) {
-                this.daysOfLogsToKeep = 7;
-            }
-        } catch (FileNotFoundException e) {
-            LogManager.logStackTrace(e);
         } catch (IOException e) {
             LogManager.logStackTrace(e);
+        }
+    }
+
+    public void loadJavaPathProperties() {
+        try {
+            this.properties.load(new FileInputStream(FileSystem.LAUNCHER_CONFIG.toFile()));
+            if (!properties.containsKey("usingcustomjavapath")) {
+                this.usingCustomJavaPath = false;
+                this.javaPath = OS.getDefaultJavaPath();
+            } else {
+                this.usingCustomJavaPath = Boolean.parseBoolean(properties.getProperty("usingcustomjavapath", "false"));
+                if (isUsingCustomJavaPath()) {
+                    this.javaPath = properties.getProperty("javapath", OS.getDefaultJavaPath());
+                } else {
+                    this.javaPath = OS.getDefaultJavaPath();
+                }
+            }
+        } catch (IOException e) {
+            this.usingCustomJavaPath = false;
+            this.javaPath = OS.getDefaultJavaPath();
         }
     }
 
@@ -1200,22 +698,12 @@ public class Settings {
     public void loadProperties() {
         LogManager.debug("Loading properties");
         try {
-            this.properties.load(new FileInputStream(propertiesFile));
+            this.properties.load(new FileInputStream(FileSystem.LAUNCHER_CONFIG.toFile()));
             this.firstTimeRun = Boolean.parseBoolean(properties.getProperty("firsttimerun", "true"));
-
-            this.hadPasswordDialog = Boolean.parseBoolean(properties.getProperty("hadpassworddialog", "false"));
 
             this.hideOldJavaWarning = Boolean.parseBoolean(properties.getProperty("hideoldjavawarning", "false"));
 
-            this.hideJava8Warning = Boolean.parseBoolean(properties.getProperty("hidejava8warning", "false"));
-
-            String lang = properties.getProperty("language", "English");
-            if (!isLanguageByName(lang)) {
-                LogManager.warn("Invalid language " + lang + ". Defaulting to English!");
-                lang = "English";
-            }
-
-            Language.INSTANCE.load(lang);
+            this.hideJava9Warning = Boolean.parseBoolean(properties.getProperty("hideJava9Warning", "false"));
 
             this.forgeLoggingLevel = properties.getProperty("forgelogginglevel", "INFO");
             if (!this.forgeLoggingLevel.equalsIgnoreCase("SEVERE")
@@ -1229,80 +717,82 @@ public class Settings {
                 this.forgeLoggingLevel = "INFO";
             }
 
-            if (Utils.is64Bit()) {
-                int halfRam = (Utils.getMaximumRam() / 1000) * 512;
-                int defaultRam = (halfRam >= 4096 ? 4096 : halfRam); // Default ram
-                this.maximumMemory = Integer.parseInt(properties.getProperty("ram", defaultRam + ""));
-                if (this.maximumMemory > Utils.getMaximumRam()) {
+            if (OS.is64Bit()) {
+                this.maximumMemory = Integer.parseInt(properties.getProperty("ram", "4096"));
+                if (OS.getMaximumRam() != 0 && this.maximumMemory > OS.getMaximumRam()) {
                     LogManager.warn("Tried to allocate " + this.maximumMemory + "MB of Ram but only "
-                            + Utils.getMaximumRam() + "MB is available to use!");
+                            + OS.getMaximumRam() + "MB is available to use!");
+                    int halfRam = (OS.getMaximumRam() / 1000) * 512;
+                    int defaultRam = (halfRam >= 8192 ? 8192 : halfRam); // Default ram
                     this.maximumMemory = defaultRam; // User tried to allocate too much ram, set it
-                    // back to
-                    // half, capped at 4GB
+                    // back to half, capped at 8GB
                 }
             } else {
                 this.maximumMemory = Integer.parseInt(properties.getProperty("ram", "1024"));
-                if (this.maximumMemory > Utils.getMaximumRam()) {
+                if (OS.getMaximumRam() != 0 && this.maximumMemory > OS.getMaximumRam()) {
                     LogManager.warn("Tried to allocate " + this.maximumMemory + "MB of Maximum Ram but only "
-                            + Utils.getMaximumRam() + "MB is available to use!");
+                            + OS.getMaximumRam() + "MB is available to use!");
                     this.maximumMemory = 1024; // User tried to allocate too much ram, set it back
                     // to 1GB
                 }
             }
 
-            this.initialMemory = Integer.parseInt(properties.getProperty("initialmemory", "256"));
-            if (this.initialMemory > Utils.getMaximumRam()) {
+            this.initialMemory = Integer.parseInt(properties.getProperty("initialmemory", "512"));
+            if (OS.getMaximumRam() != 0 && this.initialMemory > OS.getMaximumRam()) {
                 LogManager.warn("Tried to allocate " + this.initialMemory + "MB of Initial Ram but only "
-                        + Utils.getMaximumRam() + "MB is available to use!");
-                this.initialMemory = 256; // User tried to allocate too much ram, set it back to
-                // 256MB
+                        + OS.getMaximumRam() + "MB is available to use!");
+                this.initialMemory = 512; // User tried to allocate too much ram, set it back to
+                // 512MB
             } else if (this.initialMemory > this.maximumMemory) {
                 LogManager.warn("Tried to allocate " + this.initialMemory + "MB of Initial Ram but maximum ram is "
                         + this.maximumMemory + "MB which is less!");
-                this.initialMemory = 256; // User tried to allocate too much ram, set it back to 256MB
+                this.initialMemory = 512; // User tried to allocate too much ram, set it back to
+                                          // 512MB
             }
 
             // Default PermGen to 256 for 64 bit systems and 128 for 32 bit systems
-            this.permGen = Integer.parseInt(properties.getProperty("permGen", (Utils.is64Bit() ? "256" : "128")));
+            this.permGen = Integer.parseInt(properties.getProperty("permGen", (OS.is64Bit() ? "256" : "128")));
 
             this.windowWidth = Integer.parseInt(properties.getProperty("windowwidth", "854"));
-            if (this.windowWidth > Utils.getMaximumWindowWidth()) {
+            if (this.windowWidth > OS.getMaximumWindowWidth()) {
                 LogManager.warn("Tried to set window width to " + this.windowWidth + " pixels but the maximum is "
-                        + Utils.getMaximumWindowWidth() + " pixels!");
-                this.windowWidth = Utils.getMaximumWindowWidth(); // User tried to make screen size
+                        + OS.getMaximumWindowWidth() + " pixels!");
+                this.windowWidth = OS.getMaximumWindowWidth(); // User tried to make screen size
                 // wider than they have
             }
 
             this.windowHeight = Integer.parseInt(properties.getProperty("windowheight", "480"));
-            if (this.windowHeight > Utils.getMaximumWindowHeight()) {
+            if (this.windowHeight > OS.getMaximumWindowHeight()) {
                 LogManager.warn("Tried to set window height to " + this.windowHeight + " pixels but the maximum is "
-                        + Utils.getMaximumWindowHeight() + " pixels!");
-                this.windowHeight = Utils.getMaximumWindowHeight(); // User tried to make screen
+                        + OS.getMaximumWindowHeight() + " pixels!");
+                this.windowHeight = OS.getMaximumWindowHeight(); // User tried to make screen
                 // size wider than they have
             }
 
             this.usingCustomJavaPath = Boolean.parseBoolean(properties.getProperty("usingcustomjavapath", "false"));
 
             if (isUsingCustomJavaPath()) {
-                this.javaPath = properties.getProperty("javapath", Utils.getJavaHome());
+                this.javaPath = properties.getProperty("javapath", OS.getDefaultJavaPath());
             } else {
-                this.javaPath = Utils.getJavaHome();
-                if (this.isUsingMacApp()) {
+                this.javaPath = OS.getDefaultJavaPath();
+                if (OS.isUsingMacApp()) {
                     File oracleJava = new File(
-                            "/Library/Internet Plug-Ins/JavaAppletPlugin" + "" + ".plugin/Contents/Home/bin/java");
+                            "/Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home/bin/java");
                     if (oracleJava.exists() && oracleJava.canExecute()) {
                         this.setJavaPath("/Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home");
                     }
                 }
             }
 
-            this.javaParamaters = properties.getProperty("javaparameters", "");
+            this.javaParamaters = properties.getProperty("javaparameters",
+                    "-XX:+UnlockExperimentalVMOptions -XX:+UseG1GC -XX:G1NewSizePercent=20 -XX:G1ReservePercent=20 -XX:MaxGCPauseMillis=50 -XX:G1HeapRegionSize=32M");
 
             this.maximiseMinecraft = Boolean.parseBoolean(properties.getProperty("maximiseminecraft", "false"));
 
             this.saveCustomMods = Boolean.parseBoolean(properties.getProperty("savecustommods", "true"));
 
-            this.advancedBackup = Boolean.parseBoolean(properties.getProperty("advancedbackup", "false"));
+            this.ignoreJavaOnInstanceLaunch = Boolean
+                    .parseBoolean(properties.getProperty("ignorejavaoninstancelaunch", "false"));
 
             this.sortPacksAlphabetically = Boolean
                     .parseBoolean(properties.getProperty("sortpacksalphabetically", "false"));
@@ -1313,14 +803,21 @@ public class Settings {
 
             this.enableTrayIcon = Boolean.parseBoolean(properties.getProperty("enabletrayicon", "true"));
 
+            this.enableDiscordIntegration = Boolean
+                    .parseBoolean(properties.getProperty("enablediscordintegration", "true"));
+
             this.enableLeaderboards = Boolean.parseBoolean(properties.getProperty("enableleaderboards", "false"));
 
             this.enableLogs = Boolean.parseBoolean(properties.getProperty("enablelogs", "true"));
+
+            this.enableAnalytics = Boolean.parseBoolean(properties.getProperty("enableanalytics", "true"));
 
             this.enableServerChecker = Boolean.parseBoolean(properties.getProperty("enableserverchecker", "false"));
 
             this.enableOpenEyeReporting = Boolean
                     .parseBoolean(properties.getProperty("enableopeneyereporting", "true"));
+
+            this.enableModsBackups = Boolean.parseBoolean(properties.getProperty("enablemodsbackups", "true"));
 
             this.enableProxy = Boolean.parseBoolean(properties.getProperty("enableproxy", "false"));
 
@@ -1365,14 +862,6 @@ public class Settings {
                 this.concurrentConnections = 8;
             }
 
-            this.daysOfLogsToKeep = Integer.parseInt(properties.getProperty("daysoflogstokeep", "7"));
-            if (this.daysOfLogsToKeep < 1 || this.daysOfLogsToKeep > 30) {
-                // Days of logs to keep should be 1 or more but less than 30
-                LogManager.warn("Tried to set the number of days worth of logs to keep to " + this.daysOfLogsToKeep
-                        + " which is not valid! Must be between 1 and 30 inclusive. Setting back to default of 7!");
-                this.daysOfLogsToKeep = 7;
-            }
-
             this.theme = properties.getProperty("theme", Constants.LAUNCHER_NAME);
 
             this.dateFormat = properties.getProperty("dateformat", "dd/M/yyy");
@@ -1395,13 +884,14 @@ public class Settings {
             }
 
             this.addedPacks = properties.getProperty("addedpacks", "");
-            this.autoBackup = Boolean.parseBoolean(properties.getProperty("autobackup", "false"));
-            this.notifyBackup = Boolean.parseBoolean(properties.getProperty("notifybackup", "true"));
-            this.dropboxFolderLocation = properties.getProperty("dropboxlocation", "");
-        } catch (FileNotFoundException e) {
-            LogManager.logStackTrace(e);
+            this.analyticsClientId = properties.getProperty("analyticsclientid", null);
         } catch (IOException e) {
             LogManager.logStackTrace(e);
+        }
+
+        if (this.analyticsClientId == null) {
+            this.analyticsClientId = UUID.randomUUID().toString();
+            this.saveProperties();
         }
         LogManager.debug("Finished loading properties");
     }
@@ -1412,11 +902,9 @@ public class Settings {
     public void saveProperties() {
         try {
             properties.setProperty("firsttimerun", "false");
-            properties.setProperty("hadpassworddialog", "true");
             properties.setProperty("hideoldjavawarning", this.hideOldJavaWarning + "");
-            properties.setProperty("hidejava8warning", this.hideJava8Warning + "");
-            properties.setProperty("language", Language.INSTANCE.getCurrent());
-            properties.setProperty("server", this.server.getName());
+            properties.setProperty("hideJava9Warning", this.hideJava9Warning + "");
+            properties.setProperty("language", Language.selected);
             properties.setProperty("forgelogginglevel", this.forgeLoggingLevel);
             properties.setProperty("initialmemory", this.initialMemory + "");
             properties.setProperty("ram", this.maximumMemory + "");
@@ -1428,23 +916,25 @@ public class Settings {
             properties.setProperty("javaparameters", this.javaParamaters);
             properties.setProperty("maximiseminecraft", (this.maximiseMinecraft) ? "true" : "false");
             properties.setProperty("savecustommods", (this.saveCustomMods) ? "true" : "false");
-            properties.setProperty("advancedbackup", (this.advancedBackup) ? "true" : "false");
+            properties.setProperty("ignorejavaoninstancelaunch", (this.ignoreJavaOnInstanceLaunch) ? "true" : "false");
             properties.setProperty("sortpacksalphabetically", (this.sortPacksAlphabetically) ? "true" : "false");
             properties.setProperty("keeplauncheropen", (this.keepLauncherOpen) ? "true" : "false");
             properties.setProperty("enableconsole", (this.enableConsole) ? "true" : "false");
             properties.setProperty("enabletrayicon", (this.enableTrayIcon) ? "true" : "false");
+            properties.setProperty("enablediscordintegration", (this.enableDiscordIntegration) ? "true" : "false");
             properties.setProperty("enableleaderboards", (this.enableLeaderboards) ? "true" : "false");
             properties.setProperty("enablelogs", (this.enableLogs) ? "true" : "false");
+            properties.setProperty("enableanalytics", (this.enableAnalytics) ? "true" : "false");
             properties.setProperty("enablepacktags", (this.enablePackTags) ? "true" : "false");
             properties.setProperty("enableserverchecker", (this.enableServerChecker) ? "true" : "false");
             properties.setProperty("enableopeneyereporting", (this.enableOpenEyeReporting) ? "true" : "false");
+            properties.setProperty("enablemodsbackups", (this.enableModsBackups) ? "true" : "false");
             properties.setProperty("enableproxy", (this.enableProxy) ? "true" : "false");
             properties.setProperty("proxyhost", this.proxyHost);
             properties.setProperty("proxyport", this.proxyPort + "");
             properties.setProperty("proxytype", this.proxyType);
             properties.setProperty("servercheckerwait", this.serverCheckerWait + "");
             properties.setProperty("concurrentconnections", this.concurrentConnections + "");
-            properties.setProperty("daysoflogstokeep", this.daysOfLogsToKeep + "");
             properties.setProperty("theme", this.theme);
             properties.setProperty("dateformat", this.dateFormat);
             if (account != null) {
@@ -1453,12 +943,9 @@ public class Settings {
                 properties.setProperty("lastaccount", "");
             }
             properties.setProperty("addedpacks", this.addedPacks);
-            properties.setProperty("autobackup", this.autoBackup ? "true" : "false");
-            properties.setProperty("notifybackup", this.notifyBackup ? "true" : "false");
-            properties.setProperty("dropboxlocation", this.dropboxFolderLocation);
-            this.properties.store(new FileOutputStream(propertiesFile), Constants.LAUNCHER_NAME + " Settings");
-        } catch (FileNotFoundException e) {
-            LogManager.logStackTrace(e);
+            properties.setProperty("analyticsclientid", this.analyticsClientId);
+            this.properties.store(new FileOutputStream(FileSystem.LAUNCHER_CONFIG.toFile()),
+                    Constants.LAUNCHER_NAME + " Settings");
         } catch (IOException e) {
             LogManager.logStackTrace(e);
         }
@@ -1501,49 +988,9 @@ public class Settings {
         refreshFeaturedPacksPanel();
         refreshPacksPanel();
         reloadInstancesPanel();
+        reloadServersPanel();
         reloadAccounts();
         saveProperties();
-    }
-
-    /**
-     * The servers available to use in the Launcher
-     * <p/>
-     * These MUST be hardcoded in order for the Launcher to make the initial
-     * connections to download files
-     */
-    private void setupServers() {
-        this.servers = new ArrayList<Server>(Arrays.asList(Constants.SERVERS));
-    }
-
-    public boolean disableServerGetNext() {
-        this.server.disableServer(); // Disable the server
-        for (Server server : this.servers) {
-            if (!server.isDisabled() && server.isUserSelectable()) {
-                LogManager.warn("Server " + this.server.getName() + " Not Available! Switching To " + server.getName());
-                this.server = server; // Setup next available server
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public void clearTriedServers() {
-        if (this.triedServers.size() != 0) {
-            this.triedServers = new ArrayList<Server>(); // Clear the list
-            this.server = this.originalServer;
-        }
-    }
-
-    public boolean getNextServer() {
-        this.triedServers.add(this.server);
-        for (Server server : this.servers) {
-            if (!this.triedServers.contains(server) && !server.isDisabled()) {
-                LogManager.warn("Server " + this.server.getName() + " Not Available! Switching To " + server.getName());
-                this.server = server; // Setup next available server
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -1554,20 +1001,12 @@ public class Settings {
         try {
             java.lang.reflect.Type type = new TypeToken<List<News>>() {
             }.getType();
-            File fileDir = new File(getJSONDir(), "news.json");
+            File fileDir = FileSystem.JSON.resolve("news.json").toFile();
             BufferedReader in = new BufferedReader(new InputStreamReader(new FileInputStream(fileDir), "UTF-8"));
 
             this.news = Gsons.DEFAULT.fromJson(in, type);
             in.close();
-        } catch (JsonSyntaxException e) {
-            LogManager.logStackTrace(e);
-        } catch (JsonIOException e) {
-            LogManager.logStackTrace(e);
-        } catch (FileNotFoundException e) {
-            LogManager.logStackTrace(e);
-        } catch (UnsupportedEncodingException e) {
-            LogManager.logStackTrace(e);
-        } catch (IOException e) {
+        } catch (JsonIOException | JsonSyntaxException | IOException e) {
             LogManager.logStackTrace(e);
         }
         LogManager.debug("Finished loading news");
@@ -1579,13 +1018,13 @@ public class Settings {
     private void loadMinecraftVersions() {
         LogManager.debug("Loading Minecraft versions");
 
-        this.minecraftVersions = new HashMap<String, MinecraftVersion>();
+        this.minecraftVersions = new HashMap<>();
 
         try {
             java.lang.reflect.Type type = new TypeToken<List<MinecraftVersion>>() {
             }.getType();
             List<MinecraftVersion> list = Gsons.DEFAULT_ALT
-                    .fromJson(new FileReader(new File(getJSONDir(), "minecraftversions.json")), type);
+                    .fromJson(new FileReader(FileSystem.JSON.resolve("minecraft.json").toFile()), type);
 
             if (list == null) {
                 LogManager.error("Error loading Minecraft Versions. List was null. Exiting!");
@@ -1593,13 +1032,9 @@ public class Settings {
             }
 
             for (MinecraftVersion mv : list) {
-                this.minecraftVersions.put(mv.getVersion(), mv);
+                this.minecraftVersions.put(mv.version, mv);
             }
-        } catch (JsonSyntaxException e) {
-            LogManager.logStackTrace(e);
-        } catch (JsonIOException e) {
-            LogManager.logStackTrace(e);
-        } catch (FileNotFoundException e) {
+        } catch (JsonSyntaxException | FileNotFoundException | JsonIOException e) {
             LogManager.logStackTrace(e);
         }
         LogManager.debug("Finished loading Minecraft versions");
@@ -1613,12 +1048,9 @@ public class Settings {
         try {
             java.lang.reflect.Type type = new TypeToken<List<Pack>>() {
             }.getType();
-            this.packs = Gsons.DEFAULT.fromJson(new FileReader(new File(getJSONDir(), "packs.json")), type);
-        } catch (JsonSyntaxException e) {
-            LogManager.logStackTrace(e);
-        } catch (JsonIOException e) {
-            LogManager.logStackTrace(e);
-        } catch (FileNotFoundException e) {
+            this.packs = Gsons.DEFAULT_ALT.fromJson(new FileReader(FileSystem.JSON.resolve("packsnew.json").toFile()),
+                    type);
+        } catch (JsonSyntaxException | FileNotFoundException | JsonIOException e) {
             LogManager.logStackTrace(e);
         }
         LogManager.debug("Finished loading packs");
@@ -1629,19 +1061,16 @@ public class Settings {
      */
     private void loadUsers() {
         LogManager.debug("Loading users");
-        Downloadable download = new Downloadable("launcher/json/users.json", true);
         List<PackUsers> packUsers = null;
         try {
             java.lang.reflect.Type type = new TypeToken<List<PackUsers>>() {
             }.getType();
-            packUsers = Gsons.DEFAULT.fromJson(download.getContents(), type);
-        } catch (JsonSyntaxException e) {
-            LogManager.logStackTrace(e);
-        } catch (JsonIOException e) {
+            packUsers = com.atlauncher.network.Download.build().cached()
+                    .setUrl(String.format("%s/launcher/json/users.json", Constants.DOWNLOAD_SERVER)).asType(type);
+        } catch (JsonSyntaxException | JsonIOException e) {
             LogManager.logStackTrace(e);
         }
         if (packUsers == null) {
-            this.offlineMode = true;
             return;
         }
         for (PackUsers pu : packUsers) {
@@ -1655,68 +1084,46 @@ public class Settings {
      */
     private void loadInstances() {
         LogManager.debug("Loading instances");
-        this.instances = new ArrayList<Instance>(); // Reset the instances list
-        if (instancesDataFile.exists()) {
+        this.instances = new ArrayList<>(); // Reset the instances list
+        this.instancesV2 = new ArrayList<>(); // Reset the instancesv2 list
+
+        for (String folder : Optional.of(FileSystem.INSTANCES.toFile().list(Utils.getInstanceFileFilter()))
+                .orElse(new String[0])) {
+            File instanceDir = FileSystem.INSTANCES.resolve(folder).toFile();
+
+            Instance instance = null;
+            InstanceV2 instanceV2 = null;
+
             try {
-                FileInputStream in = new FileInputStream(instancesDataFile);
-                ObjectInputStream objIn = new ObjectInputStream(in);
-                try {
-                    Object obj;
-                    while ((obj = objIn.readObject()) != null) {
-                        if (obj instanceof Instance) {
-                            File dir = new File(getInstancesDir(), ((Instance) obj).getSafeName());
-                            if (!dir.exists()) {
-                                continue; // Skip the instance since the folder doesn't exist
-                            }
-                            Instance instance = (Instance) obj;
-                            if (!instance.hasBeenConverted()) {
-                                LogManager.warn("Instance " + instance.getName() + " is being converted! This is "
-                                        + "normal and should only appear once!");
-                                instance.convert();
-                            }
-                            if (!instance.getDisabledModsDirectory().exists()) {
-                                instance.getDisabledModsDirectory().mkdir();
-                            }
-                            instances.add(instance);
-                            if (isPackByName(instance.getPackName())) {
-                                instance.setRealPack(getPackByName(instance.getPackName()));
-                            }
-                        }
+                try (FileReader fileReader = new FileReader(new File(instanceDir, "instance.json"))) {
+                    instanceV2 = Gsons.MINECRAFT.fromJson(fileReader, InstanceV2.class);
+                    LogManager.debug("Loaded V2 instance from " + instanceDir);
+
+                    if (instanceV2.launcher == null) {
+                        instanceV2 = null;
+                        throw new JsonSyntaxException("Error parsing instance.json as InstanceV2");
                     }
-                } catch (EOFException e) {
-                    // Don't log this, it always happens when it gets to the end of the file
-                } finally {
-                    objIn.close();
-                    in.close();
+                } catch (JsonIOException | JsonSyntaxException ignored) {
+                    try (FileReader fileReader = new FileReader(new File(instanceDir, "instance.json"))) {
+                        instance = Gsons.DEFAULT.fromJson(fileReader, Instance.class);
+                        instance.convert();
+                        LogManager.debug("Loaded V1 instance from " + instanceDir);
+                    } catch (JsonIOException | JsonSyntaxException e) {
+                        LogManager.logStackTrace("Failed to load instance in the folder " + instanceDir, e);
+                        continue;
+                    }
                 }
-            } catch (Exception e) {
-                LogManager.logStackTrace(e);
+            } catch (Exception e2) {
+                LogManager.logStackTrace("Failed to load instance in the folder " + instanceDir, e2);
+                continue;
             }
-            saveInstances(); // Save the instances to new json format
-            Utils.delete(instancesDataFile); // Remove old instances data file
-        } else {
-            for (String folder : this.getInstancesDir().list(Utils.getInstanceFileFilter())) {
-                File instanceDir = new File(this.getInstancesDir(), folder);
-                FileReader fileReader;
 
-                Instance instance = null;
+            if (instance == null && instanceV2 == null) {
+                LogManager.error("Failed to load instance in the folder " + instanceDir);
+                continue;
+            }
 
-                try {
-                    fileReader = new FileReader(new File(instanceDir, "instance.json"));
-                    instance = Gsons.DEFAULT.fromJson(fileReader, Instance.class);
-                } catch (Exception e) {
-                    LogManager.logStackTrace("Failed to load instance in the folder " + instanceDir, e);
-                    continue; // Instance.json not found for some reason, continue before loading
-                }
-
-                if (instance == null) {
-                    LogManager.error("Failed to load instance in the folder " + instanceDir);
-                    continue;
-                }
-
-                // convert instance to latest data version
-                instance.convert();
-
+            if (instance != null) {
                 if (!instance.getDisabledModsDirectory().exists()) {
                     instance.getDisabledModsDirectory().mkdir();
                 }
@@ -1727,11 +1134,45 @@ public class Settings {
 
                 this.instances.add(instance);
             }
-            if (instancesDataFile.exists()) {
-                Utils.delete(instancesDataFile); // Remove old instances data file
+
+            if (instanceV2 != null) {
+                this.instancesV2.add(instanceV2);
             }
         }
+
         LogManager.debug("Finished loading instances");
+    }
+
+    /**
+     * Loads the user installed servers
+     */
+    private void loadServers() {
+        LogManager.debug("Loading servers");
+        this.servers = new ArrayList<>(); // Reset the servers list
+
+        for (String folder : Optional.of(FileSystem.SERVERS.toFile().list(Utils.getServerFileFilter()))
+                .orElse(new String[0])) {
+            File serverDir = FileSystem.SERVERS.resolve(folder).toFile();
+
+            Server server = null;
+
+            try (FileReader fileReader = new FileReader(new File(serverDir, "server.json"))) {
+                server = Gsons.MINECRAFT.fromJson(fileReader, Server.class);
+                LogManager.debug("Loaded server from " + serverDir);
+            } catch (Exception e) {
+                LogManager.logStackTrace("Failed to load server in the folder " + serverDir, e);
+                continue;
+            }
+
+            if (server == null) {
+                LogManager.error("Failed to load server in the folder " + serverDir);
+                continue;
+            }
+
+            this.servers.add(server);
+        }
+
+        LogManager.debug("Finished loading servers");
     }
 
     public void saveInstances() {
@@ -1772,11 +1213,11 @@ public class Settings {
      */
     private void loadAccounts() {
         LogManager.debug("Loading accounts");
-        if (userDataFile.exists()) {
+        if (Files.exists(FileSystem.USER_DATA)) {
             FileInputStream in = null;
             ObjectInputStream objIn = null;
             try {
-                in = new FileInputStream(userDataFile);
+                in = new FileInputStream(FileSystem.USER_DATA.toFile());
                 objIn = new ObjectInputStream(in);
                 Object obj;
                 while ((obj = objIn.readObject()) != null) {
@@ -1786,9 +1227,7 @@ public class Settings {
                 }
             } catch (EOFException e) {
                 // Don't log this, it always happens when it gets to the end of the file
-            } catch (IOException e) {
-                LogManager.logStackTrace("Exception while trying to read accounts in from file.", e);
-            } catch (ClassNotFoundException e) {
+            } catch (IOException | ClassNotFoundException e) {
                 LogManager.logStackTrace("Exception while trying to read accounts in from file.", e);
             } finally {
                 try {
@@ -1813,7 +1252,7 @@ public class Settings {
         FileOutputStream out = null;
         ObjectOutputStream objOut = null;
         try {
-            out = new FileOutputStream(userDataFile);
+            out = new FileOutputStream(FileSystem.USER_DATA.toFile());
             objOut = new ObjectOutputStream(out);
             for (Account account : accounts) {
                 objOut.writeObject(account);
@@ -1851,11 +1290,11 @@ public class Settings {
      */
     private void loadCheckingServers() {
         LogManager.debug("Loading servers to check");
-        this.checkingServers = new ArrayList<MinecraftServer>(); // Reset the list
-        if (checkingServersFile.exists()) {
+        this.checkingServers = new ArrayList<>(); // Reset the list
+        if (Files.exists(FileSystem.CHECKING_SERVERS_JSON)) {
             FileReader fileReader = null;
             try {
-                fileReader = new FileReader(checkingServersFile);
+                fileReader = new FileReader(FileSystem.CHECKING_SERVERS_JSON.toFile());
             } catch (FileNotFoundException e) {
                 LogManager.logStackTrace(e);
                 return;
@@ -1880,11 +1319,11 @@ public class Settings {
         FileWriter fw = null;
         BufferedWriter bw = null;
         try {
-            if (!checkingServersFile.exists()) {
-                checkingServersFile.createNewFile();
+            if (!Files.exists(FileSystem.CHECKING_SERVERS_JSON)) {
+                Files.createFile(FileSystem.CHECKING_SERVERS_JSON);
             }
 
-            fw = new FileWriter(checkingServersFile);
+            fw = new FileWriter(FileSystem.CHECKING_SERVERS_JSON.toFile());
             bw = new BufferedWriter(fw);
             bw.write(Gsons.DEFAULT.toJson(this.checkingServers));
         } catch (IOException e) {
@@ -1944,7 +1383,7 @@ public class Settings {
      * @return The Packs available in the Launcher sorted alphabetically
      */
     public List<Pack> getPacksSortedAlphabetically(boolean isFeatured, boolean isVanilla) {
-        List<Pack> packs = new LinkedList<Pack>();
+        List<Pack> packs = new LinkedList<>();
 
         for (Pack pack : this.packs) {
             if (isFeatured) {
@@ -1964,12 +1403,7 @@ public class Settings {
             }
         }
 
-        Collections.sort(packs, new Comparator<Pack>() {
-            @Override
-            public int compare(Pack result1, Pack result2) {
-                return result1.getName().compareTo(result2.getName());
-            }
-        });
+        packs.sort(Comparator.comparing(Pack::getName));
         return packs;
     }
 
@@ -1979,7 +1413,7 @@ public class Settings {
      * @return The Packs available in the Launcher sorted by position
      */
     public List<Pack> getPacksSortedPositionally(boolean isFeatured, boolean isVanilla) {
-        List<Pack> packs = new LinkedList<Pack>();
+        List<Pack> packs = new LinkedList<>();
 
         for (Pack pack : this.packs) {
             if (isFeatured) {
@@ -1987,7 +1421,7 @@ public class Settings {
                     continue;
                 }
             }
-            
+
             if (isVanilla) {
                 if (pack.getSafeName().startsWith("VanillaMinecraft")) {
                     packs.add(pack);
@@ -1999,13 +1433,7 @@ public class Settings {
             }
         }
 
-        Collections.sort(packs, new Comparator<Pack>() {
-            @Override
-            public int compare(Pack result1, Pack result2) {
-                return (result1.getPosition() < result2.getPosition()) ? -1
-                        : ((result1.getPosition() == result2.getPosition()) ? 0 : 1);
-            }
-        });
+        packs.sort(Comparator.comparingInt(Pack::getPosition));
         return packs;
     }
 
@@ -2029,10 +1457,6 @@ public class Settings {
         }
     }
 
-    public boolean isUsingMacApp() {
-        return Utils.isMac() && new File(baseDir.getParentFile().getParentFile(), "MacOS").exists();
-    }
-
     public void setInstanceVisbility(Instance instance, boolean collapsed) {
         if (instance != null && account.isReal()) {
             if (collapsed) {
@@ -2051,6 +1475,42 @@ public class Settings {
         }
     }
 
+    public void setInstanceVisbility(InstanceV2 instanceV2, boolean collapsed) {
+        if (instanceV2 != null && account.isReal()) {
+            if (collapsed) {
+                // Closed It
+                if (!account.getCollapsedInstances().contains(instanceV2.launcher.name)) {
+                    account.getCollapsedInstances().add(instanceV2.launcher.name);
+                }
+            } else {
+                // Opened It
+                if (account.getCollapsedInstances().contains(instanceV2.launcher.name)) {
+                    account.getCollapsedInstances().remove(instanceV2.launcher.name);
+                }
+            }
+            saveAccounts();
+            reloadInstancesPanel();
+        }
+    }
+
+    public void setServerVisibility(Server server, boolean collapsed) {
+        if (server != null && account.isReal()) {
+            if (collapsed) {
+                // Closed It
+                if (!account.getCollapsedServers().contains(server.name)) {
+                    account.getCollapsedServers().add(server.name);
+                }
+            } else {
+                // Opened It
+                if (account.getCollapsedServers().contains(server.name)) {
+                    account.getCollapsedServers().remove(server.name);
+                }
+            }
+            saveAccounts();
+            reloadServersPanel();
+        }
+    }
+
     /**
      * Get the Instances available in the Launcher
      *
@@ -2066,14 +1526,21 @@ public class Settings {
      * @return The Instances available in the Launcher sorted alphabetically
      */
     public ArrayList<Instance> getInstancesSorted() {
-        ArrayList<Instance> instances = new ArrayList<Instance>(this.instances);
-        Collections.sort(instances, new Comparator<Instance>() {
-            @Override
-            public int compare(Instance result1, Instance result2) {
-                return result1.getName().compareTo(result2.getName());
-            }
-        });
+        ArrayList<Instance> instances = new ArrayList<>(this.instances);
+        instances.sort(Comparator.comparing(Instance::getName));
         return instances;
+    }
+
+    public ArrayList<InstanceV2> getInstancesV2Sorted() {
+        ArrayList<InstanceV2> instances = new ArrayList<>(this.instancesV2);
+        instances.sort(Comparator.comparing(i -> i.launcher.name));
+        return instances;
+    }
+
+    public ArrayList<Server> getServersSorted() {
+        ArrayList<Server> servers = new ArrayList<>(this.servers);
+        servers.sort(Comparator.comparing(s -> s.name));
+        return servers;
     }
 
     public void setInstanceUnplayable(Instance instance) {
@@ -2095,13 +1562,31 @@ public class Settings {
         }
     }
 
+    public void removeInstance(InstanceV2 instance) {
+        if (this.instancesV2.remove(instance)) {
+            FileUtils.deleteDirectory(instance.getRoot());
+            reloadInstancesPanel();
+        }
+    }
+
+    public void removeServer(Server server) {
+        if (this.servers.remove(server)) {
+            FileUtils.deleteDirectory(server.getRoot());
+            reloadServersPanel();
+        }
+    }
+
     public boolean canViewSemiPublicPackByCode(String packCode) {
         for (String code : this.addedPacks.split(",")) {
-            if (Utils.getMD5(code).equalsIgnoreCase(packCode)) {
+            if (Hashing.md5(code).equals(Hashing.HashCode.fromString(packCode))) {
                 return true;
             }
         }
         return false;
+    }
+
+    public boolean isMinecraftVersion(String version) {
+        return this.minecraftVersions.containsKey(version);
     }
 
     public MinecraftVersion getMinecraftVersion(String version) throws InvalidMinecraftVersion {
@@ -2112,10 +1597,9 @@ public class Settings {
     }
 
     public boolean semiPublicPackExistsFromCode(String packCode) {
-        String packCodeMD5 = Utils.getMD5(packCode);
         for (Pack pack : this.packs) {
             if (pack.isSemiPublic()) {
-                if (pack.getCode().equalsIgnoreCase(packCodeMD5)) {
+                if (Hashing.HashCode.fromString(pack.getCode()).equals(Hashing.md5(packCode))) {
                     return true;
                 }
             }
@@ -2124,10 +1608,9 @@ public class Settings {
     }
 
     public Pack getSemiPublicPackByCode(String packCode) {
-        String packCodeMD5 = Utils.getMD5(packCode);
         for (Pack pack : this.packs) {
             if (pack.isSemiPublic()) {
-                if (pack.getCode().equalsIgnoreCase(packCodeMD5)) {
+                if (Hashing.HashCode.fromString(pack.getCode()).equals(Hashing.md5(packCode))) {
                     return pack;
                 }
             }
@@ -2137,10 +1620,9 @@ public class Settings {
     }
 
     public boolean addPack(String packCode) {
-        String packCodeMD5 = Utils.getMD5(packCode);
         for (Pack pack : this.packs) {
-            if (pack.isSemiPublic() && !App.settings.canViewSemiPublicPackByCode(packCodeMD5)) {
-                if (pack.getCode().equalsIgnoreCase(packCodeMD5)) {
+            if (pack.isSemiPublic() && !App.settings.canViewSemiPublicPackByCode(Hashing.md5(packCode).toString())) {
+                if (Hashing.HashCode.fromString(pack.getCode()).equals(Hashing.md5(packCode))) {
                     if (pack.isTester()) {
                         return false;
                     }
@@ -2158,7 +1640,7 @@ public class Settings {
 
     public void removePack(String packCode) {
         for (String code : this.addedPacks.split(",")) {
-            if (Utils.getMD5(code).equalsIgnoreCase(packCode)) {
+            if (Hashing.md5(code).equals(Hashing.HashCode.fromString(packCode))) {
                 this.addedPacks = this.addedPacks.replace(code + ",", ""); // Remove the string
                 this.saveProperties();
                 this.refreshVanillaPacksPanel();
@@ -2204,73 +1686,6 @@ public class Settings {
     }
 
     /**
-     * Get the Languages available in the Launcher
-     *
-     * @return The Languages available in the Launcher
-     */
-    public List<String> getLanguages() {
-        List<String> langs = new LinkedList<String>();
-        for (File file : this.getLanguagesDir().listFiles(new FilenameFilter() {
-            @Override
-            public boolean accept(File dir, String name) {
-                return name.endsWith(".lang");
-            }
-        })) {
-            langs.add(file.getName().substring(0, file.getName().lastIndexOf(".")));
-        }
-        return langs;
-    }
-
-    /**
-     * Get the Servers available in the Launcher
-     *
-     * @return The Servers available in the Launcher
-     */
-    public List<Server> getServers() {
-        return this.servers;
-    }
-
-    /**
-     * Determines if offline mode is enabled or not
-     *
-     * @return true if offline mode is enabled, false otherwise
-     */
-    public boolean isInOfflineMode() {
-        return this.offlineMode;
-    }
-
-    public void checkOnlineStatus() {
-        for (Server server : servers) {
-            server.enableServer();
-        }
-        this.offlineMode = false;
-        Downloadable download = new Downloadable("ping", true);
-        String test = download.getContents();
-        if (test != null && test.equalsIgnoreCase("pong")) {
-            reloadVanillaPacksPanel();
-            reloadFeaturedPacksPanel();
-            reloadPacksPanel();
-            reloadInstancesPanel();
-        } else {
-            this.offlineMode = true;
-        }
-    }
-
-    /**
-     * Sets the launcher to offline mode
-     */
-    public void setOfflineMode() {
-        this.offlineMode = true;
-    }
-
-    /**
-     * Sets the launcher to online mode
-     */
-    public void setOnlineMode() {
-        this.offlineMode = false;
-    }
-
-    /**
      * Returns the JFrame reference of the main Launcher
      *
      * @return Main JFrame of the Launcher
@@ -2294,6 +1709,16 @@ public class Settings {
     public void reloadInstancesPanel() {
         if (instancesPanel != null) {
             this.instancesPanel.reload(); // Reload the instances panel
+        }
+    }
+
+    public void setServersPanel(ServersTab serversPanel) {
+        this.serversPanel = serversPanel;
+    }
+
+    public void reloadServersPanel() {
+        if (serversPanel != null) {
+            this.serversPanel.reload(); // Reload the servers panel
         }
     }
 
@@ -2413,7 +1838,13 @@ public class Settings {
                 return true;
             }
         }
-        return false;
+        return this.instancesV2.stream()
+                .anyMatch(i -> i.getSafeName().equalsIgnoreCase(name.replaceAll("[^A-Za-z0-9]", "")));
+    }
+
+    public boolean isServer(String name) {
+        return this.servers.stream()
+                .anyMatch(s -> s.getSafeName().equalsIgnoreCase(name.replaceAll("[^A-Za-z0-9]", "")));
     }
 
     /**
@@ -2538,21 +1969,6 @@ public class Settings {
     }
 
     /**
-     * Finds a Server from the given name
-     *
-     * @param name Name of the Server to find
-     * @return Server if the server is found from the name
-     */
-    private Server getServerByName(String name) {
-        for (Server server : servers) {
-            if (server.getName().equalsIgnoreCase(name)) {
-                return server;
-            }
-        }
-        return null;
-    }
-
-    /**
      * Finds an Account from the given username
      *
      * @param username Username of the Account to find
@@ -2565,31 +1981,6 @@ public class Settings {
             }
         }
         return null;
-    }
-
-    /**
-     * Finds if a language is available
-     *
-     * @param name The name of the Language
-     * @return true if found, false if not
-     */
-    public boolean isLanguageByName(String name) {
-        return this.getLanguages().contains(name.toLowerCase());
-    }
-
-    /**
-     * Finds if a server is available
-     *
-     * @param name The name of the Server
-     * @return true if found, false if not
-     */
-    public boolean isServerByName(String name) {
-        for (Server server : servers) {
-            if (server.getName().equalsIgnoreCase(name)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
@@ -2607,119 +1998,28 @@ public class Settings {
         return false;
     }
 
-    /**
-     * Gets the URL for a file on the user selected server
-     *
-     * @param filename Filename including directories on the server
-     * @return URL of the file
-     */
-    public String getFileURL(String filename) {
-        return this.server.getFileURL(filename);
-    }
-
-    /**
-     * Gets the URL for a file on the master server
-     *
-     * @param filename Filename including directories on the server
-     * @return URL of the file or null if no master server defined
-     */
-    public String getMasterFileURL(String filename) {
-        for (Server server : this.servers) {
-            if (server.isMaster()) {
-                return server.getFileURL(filename);
-            }
-        }
-        return null;
-    }
-
-    /**
-     * Finds out if the Launcher Console is visible or not
-     *
-     * @return true if the console is visible, false if it's been hidden
-     */
-    public boolean isConsoleVisible() {
-        return this.console.isVisible();
-    }
-
-    /**
-     * Gets the Launcher's current Console instance
-     *
-     * @return The Launcher's Console instance
-     */
-    public LauncherConsole getConsole() {
-        return this.console;
-    }
-
-    public void clearConsole() {
-        this.console.clearConsole();
-    }
-
-    public void addConsoleListener(WindowAdapter wa) {
-        this.console.addWindowListener(wa);
-    }
-
-    public String getLog() {
-        return this.console.getLog();
-    }
-
     public void showKillMinecraft(Process minecraft) {
         this.minecraftProcess = minecraft;
-        this.console.showKillMinecraft();
+        App.console.showKillMinecraft();
     }
 
     public void hideKillMinecraft() {
-        this.console.hideKillMinecraft();
+        App.console.hideKillMinecraft();
     }
 
     public void killMinecraft() {
         if (this.minecraftProcess != null) {
             LogManager.error("Killing Minecraft");
+
+            if (App.settings.enableDiscordIntegration() && App.discordInitialized) {
+                DiscordRPC.discordClearPresence();
+            }
+
             this.minecraftProcess.destroy();
             this.minecraftProcess = null;
         } else {
             LogManager.error("Cannot kill Minecraft as there is no instance open!");
         }
-    }
-
-    /**
-     * Sets the users current active Language
-     *
-     * @param language The language to set to
-     */
-    public void setLanguage(String language) {
-        try {
-            Language.INSTANCE.load(language);
-        } catch (IOException ex) {
-            LogManager.logStackTrace("Failed to load language", ex);
-        }
-    }
-
-    /**
-     * Gets the users current active Server
-     *
-     * @return The users set server
-     */
-    public Server getServer() {
-        return this.server;
-    }
-
-    /**
-     * Sets the users current active Server
-     *
-     * @param server The server to set to
-     */
-    public void setServer(Server server) {
-        this.server = server;
-        this.originalServer = server;
-    }
-
-    /**
-     * Gets the users saved Server
-     *
-     * @return The users saved server
-     */
-    public Server getOriginalServer() {
-        return this.originalServer;
     }
 
     /**
@@ -2787,7 +2087,7 @@ public class Settings {
     }
 
     public void setJavaPath(String javaPath) {
-        this.usingCustomJavaPath = !javaPath.equalsIgnoreCase(Utils.getJavaHome());
+        this.usingCustomJavaPath = !javaPath.equalsIgnoreCase(OS.getDefaultJavaPath());
         this.javaPath = javaPath;
     }
 
@@ -2824,17 +2124,12 @@ public class Settings {
         this.saveCustomMods = saveCustomMods;
     }
 
-    /**
-     * If the user has selected to enable advanced backups
-     *
-     * @return true if yes, false if not
-     */
-    public boolean isAdvancedBackupsEnabled() {
-        return this.advancedBackup;
+    public boolean ignoreJavaOnInstanceLaunch() {
+        return this.ignoreJavaOnInstanceLaunch;
     }
 
-    public void setAdvancedBackups(boolean advancedBackup) {
-        this.advancedBackup = advancedBackup;
+    public void setIgnoreJavaOnInstanceLaunch(boolean ignoreJavaOnInstanceLaunch) {
+        this.ignoreJavaOnInstanceLaunch = ignoreJavaOnInstanceLaunch;
     }
 
     /**
@@ -2877,6 +2172,10 @@ public class Settings {
         return this.enableTrayIcon;
     }
 
+    public boolean enableDiscordIntegration() {
+        return this.enableDiscordIntegration;
+    }
+
     public void setEnableConsole(boolean enableConsole) {
         this.enableConsole = enableConsole;
     }
@@ -2885,47 +2184,16 @@ public class Settings {
         this.keepLauncherOpen = keepLauncherOpen;
     }
 
-    public String getLastSelectedSync() {
-        if (this.lastSelectedSync == null) {
-            setLastSelectedSync("Dropbox");
-        }
-        return this.lastSelectedSync;
-    }
-
-    public void setLastSelectedSync(String lastSelected) {
-        this.lastSelectedSync = lastSelected;
-        saveProperties();
-    }
-
-    public boolean getNotifyBackup() {
-        return this.notifyBackup;
-    }
-
-    public void setNotifyBackup(boolean notify) {
-        this.notifyBackup = notify;
-        saveProperties();
-    }
-
-    public String getDropboxLocation() {
-        return this.dropboxFolderLocation;
-    }
-
-    public void setDropboxLocation(String dropboxLoc) {
-        this.dropboxFolderLocation = dropboxLoc;
-        saveProperties();
-    }
-
-    public boolean getAutoBackup() {
-        return this.autoBackup;
-    }
-
-    public void setAutoBackup(boolean enableBackup) {
-        this.autoBackup = enableBackup;
-        saveProperties();
+    public String getAnalyticsClientId() {
+        return this.analyticsClientId;
     }
 
     public void setEnableTrayIcon(boolean enableTrayIcon) {
         this.enableTrayIcon = enableTrayIcon;
+    }
+
+    public void setEnableDiscordIntegration(boolean enableDiscordIntegration) {
+        this.enableDiscordIntegration = enableDiscordIntegration;
     }
 
     public boolean enableLeaderboards() {
@@ -2944,6 +2212,14 @@ public class Settings {
         this.enableLogs = enableLogs;
     }
 
+    public boolean enableAnalytics() {
+        return this.enableAnalytics;
+    }
+
+    public void setEnableAnalytics(boolean enableAnalytics) {
+        this.enableAnalytics = enableAnalytics;
+    }
+
     public boolean enableServerChecker() {
         return this.enableServerChecker;
     }
@@ -2958,6 +2234,14 @@ public class Settings {
 
     public void setEnableOpenEyeReporting(boolean enableOpenEyeReporting) {
         this.enableOpenEyeReporting = enableOpenEyeReporting;
+    }
+
+    public boolean enableModsBackups() {
+        return this.enableModsBackups;
+    }
+
+    public void setEnableModsBackups(boolean enableModsBackups) {
+        this.enableModsBackups = enableModsBackups;
     }
 
     public boolean getEnableProxy() {
@@ -3012,14 +2296,6 @@ public class Settings {
         this.concurrentConnections = concurrentConnections;
     }
 
-    public int getDaysOfLogsToKeep() {
-        return this.daysOfLogsToKeep;
-    }
-
-    public void setDaysOfLogsToKeep(int daysOfLogsToKeep) {
-        this.daysOfLogsToKeep = daysOfLogsToKeep;
-    }
-
     public String getTheme() {
         return this.theme;
     }
@@ -3029,9 +2305,9 @@ public class Settings {
     }
 
     public File getThemeFile() {
-        File theme = new File(this.themesDir, this.theme + ".zip");
-        if (theme.exists()) {
-            return theme;
+        File themeFile = FileSystem.THEMES.resolve(this.theme + ".zip").toFile();
+        if (themeFile.exists()) {
+            return themeFile;
         } else {
             return null;
         }
@@ -3043,7 +2319,12 @@ public class Settings {
 
     public void setDateFormat(String dateFormat) {
         this.dateFormat = dateFormat;
-        Timestamper.updateDateFormat();
+
+        try {
+            Timestamper.updateDateFormat(dateFormat);
+        } catch (Exception e) {
+            LogManager.logStackTrace("Error updating date format to " + dateFormat, e);
+        }
     }
 
     public Proxy getProxy() {
@@ -3052,13 +2333,17 @@ public class Settings {
         }
         if (this.proxy == null) {
             Type type;
-            if (this.proxyType.equals("HTTP")) {
-                type = Proxy.Type.HTTP;
-            } else if (this.proxyType.equals("SOCKS")) {
-                type = Proxy.Type.SOCKS;
-            } else if (this.proxyType.equals("DIRECT")) {
-                type = Proxy.Type.DIRECT;
-            } else {
+            switch (this.proxyType) {
+            case "HTTP":
+                type = Type.HTTP;
+                break;
+            case "SOCKS":
+                type = Type.SOCKS;
+                break;
+            case "DIRECT":
+                type = Type.DIRECT;
+                break;
+            default:
                 // Oh noes, problem!
                 LogManager.warn("Tried to set proxy type to " + this.proxyType + " which is not valid! Proxy support "
                         + "disabled!");
@@ -3076,13 +2361,17 @@ public class Settings {
         }
         if (this.proxy == null) {
             Type type;
-            if (this.proxyType.equals("HTTP")) {
-                type = Proxy.Type.HTTP;
-            } else if (this.proxyType.equals("SOCKS")) {
-                type = Proxy.Type.SOCKS;
-            } else if (this.proxyType.equals("DIRECT")) {
-                type = Proxy.Type.DIRECT;
-            } else {
+            switch (this.proxyType) {
+            case "HTTP":
+                type = Type.HTTP;
+                break;
+            case "SOCKS":
+                type = Type.SOCKS;
+                break;
+            case "DIRECT":
+                type = Type.DIRECT;
+                break;
+            default:
                 // Oh noes, problem!
                 LogManager.warn("Tried to set proxy type to " + this.proxyType + " which is not valid! Proxy support "
                         + "disabled!");
@@ -3095,75 +2384,35 @@ public class Settings {
     }
 
     public String getUserAgent() {
-        return this.userAgent + Constants.LAUNCHER_NAME + "/" + Constants.VERSION;
-    }
-
-    /**
-     * @deprecated
-     */
-    @Deprecated
-    public String getLocalizedString(String string) {
-        return Language.INSTANCE.localize(string);
-    }
-
-    /**
-     * @deprecated
-     */
-    @Deprecated
-    public String getLocalizedString(String string, String replace) {
-        return Language.INSTANCE.localize(string).replace("%s", replace);
-    }
-
-    public void restartLauncher() {
-        File thisFile = new File(Update.class.getProtectionDomain().getCodeSource().getLocation().getPath());
-        String path = null;
-        try {
-            path = thisFile.getCanonicalPath();
-            path = URLDecoder.decode(path, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            LogManager.logStackTrace(e);
-        } catch (IOException e) {
-            LogManager.logStackTrace(e);
-        }
-
-        List<String> arguments = new ArrayList<String>();
-
-        if (this.isUsingMacApp()) {
-            arguments.add("open");
-            arguments.add("-n");
-            arguments.add(baseDir.getParentFile().getParentFile().getParentFile().getAbsolutePath());
-
-        } else {
-            String jpath = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java";
-            if (Utils.isWindows()) {
-                jpath += "w";
-            }
-            arguments.add(jpath);
-            arguments.add("-jar");
-            arguments.add(path);
-        }
-
-        ProcessBuilder processBuilder = new ProcessBuilder();
-        processBuilder.command(arguments);
-
-        try {
-            processBuilder.start();
-        } catch (IOException e) {
-            LogManager.logStackTrace("Failed to start updater process", e);
-        }
-        System.exit(0);
+        return this.userAgent + Constants.LAUNCHER_NAME + "/" + Constants.VERSION + " Java/"
+                + Java.getLauncherJavaVersion();
     }
 
     public void cloneInstance(Instance instance, String clonedName) {
         Instance clonedInstance = (Instance) instance.clone();
         if (clonedInstance == null) {
-            LogManager.error("Error Occured While Cloning Instance! Instance Object Couldn't Be Cloned!");
+            LogManager.error("Error Occurred While Cloning Instance! Instance Object Couldn't Be Cloned!");
         } else {
             clonedInstance.setName(clonedName);
             clonedInstance.getRootDirectory().mkdir();
             Utils.copyDirectory(instance.getRootDirectory(), clonedInstance.getRootDirectory());
             this.instances.add(clonedInstance);
             this.saveInstances();
+            this.reloadInstancesPanel();
+        }
+    }
+
+    public void cloneInstance(InstanceV2 instance, String clonedName) {
+        InstanceV2 clonedInstance = Gsons.MINECRAFT.fromJson(Gsons.MINECRAFT.toJson(instance), InstanceV2.class);
+
+        if (clonedInstance == null) {
+            LogManager.error("Error Occurred While Cloning Instance! Instance Object Couldn't Be Cloned!");
+        } else {
+            clonedInstance.launcher.name = clonedName;
+            FileUtils.createDirectory(clonedInstance.getRoot());
+            Utils.copyDirectory(instance.getRoot().toFile(), clonedInstance.getRoot().toFile());
+            clonedInstance.save();
+            this.instancesV2.add(clonedInstance);
             this.reloadInstancesPanel();
         }
     }

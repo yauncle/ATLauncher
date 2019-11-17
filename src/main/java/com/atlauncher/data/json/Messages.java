@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,21 +17,20 @@
  */
 package com.atlauncher.data.json;
 
-import com.atlauncher.App;
-import com.atlauncher.annot.Json;
-import com.atlauncher.data.Language;
-import com.atlauncher.data.Pack;
-import com.atlauncher.utils.Utils;
-
 import javax.swing.JEditorPane;
-import javax.swing.JOptionPane;
 import javax.swing.event.HyperlinkEvent;
-import javax.swing.event.HyperlinkListener;
+
+import com.atlauncher.annot.Json;
+import com.atlauncher.data.Pack;
+import com.atlauncher.managers.DialogManager;
+import com.atlauncher.utils.OS;
+
+import org.mini2Dx.gettext.GetText;
 
 @Json
 public class Messages {
-    private String install;
-    private String update;
+    public String install;
+    public String update;
 
     public boolean hasInstallMessage() {
         return this.install != null;
@@ -42,20 +41,16 @@ public class Messages {
     }
 
     public int showInstallMessage(Pack pack) {
-        String[] options = {Language.INSTANCE.localize("common.ok"), Language.INSTANCE.localize("common.cancel")};
         JEditorPane ep = new JEditorPane("text/html", "<html>" + this.install + "</html>");
         ep.setEditable(false);
-        ep.addHyperlinkListener(new HyperlinkListener() {
-            @Override
-            public void hyperlinkUpdate(HyperlinkEvent e) {
-                if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-                    Utils.openBrowser(e.getURL());
-                }
+        ep.addHyperlinkListener(e -> {
+            if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+                OS.openWebBrowser(e.getURL());
             }
         });
-        return JOptionPane.showOptionDialog(App.settings.getParent(), ep, Language.INSTANCE.localize("common" + "" +
-                        ".installing") + " " + pack.getName(), JOptionPane.DEFAULT_OPTION, JOptionPane
-                .WARNING_MESSAGE, null, options, options[0]);
+        return DialogManager.optionDialog().setTitle(GetText.tr("Installing")).setContent(ep)
+                .setType(DialogManager.WARNING).addOption(GetText.tr("Ok"), true).addOption(GetText.tr("Cancel"))
+                .show();
     }
 
     public String getUpdateMessage() {
@@ -67,19 +62,15 @@ public class Messages {
     }
 
     public int showUpdateMessage(Pack pack) {
-        String[] options = {Language.INSTANCE.localize("common.ok"), Language.INSTANCE.localize("common.cancel")};
         JEditorPane ep = new JEditorPane("text/html", "<html>" + this.update + "</html>");
         ep.setEditable(false);
-        ep.addHyperlinkListener(new HyperlinkListener() {
-            @Override
-            public void hyperlinkUpdate(HyperlinkEvent e) {
-                if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-                    Utils.openBrowser(e.getURL());
-                }
+        ep.addHyperlinkListener(e -> {
+            if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+                OS.openWebBrowser(e.getURL());
             }
         });
-        return JOptionPane.showOptionDialog(App.settings.getParent(), ep, Language.INSTANCE.localize("common" + "" +
-                        ".reinstalling") + " " + pack.getName(), JOptionPane.DEFAULT_OPTION, JOptionPane
-                .WARNING_MESSAGE, null, options, options[0]);
+        return DialogManager.optionDialog().setTitle(GetText.tr("Reinstalling") + " " + pack.getName()).setContent(ep)
+                .setType(DialogManager.WARNING).addOption(GetText.tr("Ok"), true).addOption(GetText.tr("Cancel"))
+                .show();
     }
 }

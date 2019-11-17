@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,14 +17,14 @@
  */
 package com.atlauncher.utils;
 
+import java.net.InetSocketAddress;
+
 import de.zh32.pingtest.QueryVersion;
 import de.zh32.pingtest.ServerListPing14;
 import de.zh32.pingtest.ServerListPing16;
 import de.zh32.pingtest.ServerListPing17;
 import de.zh32.pingtest.ServerListPing17.StatusResponse;
 import de.zh32.pingtest.ServerListPingB18;
-
-import java.net.InetSocketAddress;
 
 public class MCQuery {
     public static QueryVersion getMinecraftServerQueryVersion(String host, int port) {
@@ -35,7 +35,7 @@ public class MCQuery {
             ping16.setAddress(inetSocketAddress);
             ping16.fetchData();
             return QueryVersion.mc16;
-        } catch (Exception ex) {
+        } catch (Exception ignored) {
         }
 
         try {
@@ -43,7 +43,7 @@ public class MCQuery {
             ping14.setAddress(inetSocketAddress);
             ping14.fetchData();
             return QueryVersion.mc14;
-        } catch (Exception ex) {
+        } catch (Exception ignored) {
         }
 
         try {
@@ -51,7 +51,7 @@ public class MCQuery {
             pingb18.setAddress(inetSocketAddress);
             pingb18.fetchData();
             return QueryVersion.mc18b;
-        } catch (Exception ex) {
+        } catch (Exception ignored) {
         }
 
         // 1.7 must be queried last because if not, the rest of the checks will ALWAYS fail for some
@@ -61,7 +61,7 @@ public class MCQuery {
             ping17.setAddress(inetSocketAddress);
             ping17.fetchData();
             return QueryVersion.mc17;
-        } catch (Exception ex) {
+        } catch (Exception ignored) {
         }
 
         return null; // Couldn't determine version so return null
@@ -77,7 +77,7 @@ public class MCQuery {
                     ping14.setAddress(inetSocketAddress);
                     ping14.fetchData();
                     return ping14.getPlayersOnline();
-                } catch (Exception ex) {
+                } catch (Exception ignored) {
                 }
                 return -1; // Server not reachable so send -1 for offline
             case mc16:
@@ -86,7 +86,7 @@ public class MCQuery {
                     ping16.setAddress(inetSocketAddress);
                     ping16.fetchData();
                     return ping16.getPlayersOnline();
-                } catch (Exception ex) {
+                } catch (Exception ignored) {
                 }
                 return -1; // Server not reachable so send -1 for offline
             case mc17:
@@ -95,7 +95,7 @@ public class MCQuery {
                     ping17.setAddress(inetSocketAddress);
                     StatusResponse response = ping17.fetchData();
                     return response.getPlayers().getOnline();
-                } catch (Exception ex) {
+                } catch (Exception ignored) {
                 }
                 return -1; // Server not reachable so send -1 for offline
             case mc18b:
@@ -104,7 +104,7 @@ public class MCQuery {
                     pingb18.setAddress(inetSocketAddress);
                     pingb18.fetchData();
                     return pingb18.getPlayersOnline();
-                } catch (Exception ex) {
+                } catch (Exception ignored) {
                 }
                 return -1; // Server not reachable so send -1 for offline
             default:

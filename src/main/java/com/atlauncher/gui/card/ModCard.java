@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package com.atlauncher.gui.card;
 
 import java.awt.Color;
@@ -28,9 +27,10 @@ import java.awt.event.MouseEvent;
 
 import javax.swing.JPanel;
 
-import com.atlauncher.data.Mod;
-import com.atlauncher.utils.Utils;
+import com.atlauncher.data.json.Mod;
+import com.atlauncher.utils.OS;
 
+@SuppressWarnings("serial")
 public final class ModCard extends JPanel {
     public final Mod mod;
 
@@ -46,7 +46,7 @@ public final class ModCard extends JPanel {
             public void mouseClicked(MouseEvent e) {
                 super.mouseClicked(e);
                 if (ModCard.this.mod.hasWebsite()) {
-                    Utils.openBrowser(mod.getWebsite());
+                    OS.openWebBrowser(mod.getWebsite());
                 }
             }
         });
@@ -58,7 +58,7 @@ public final class ModCard extends JPanel {
         g2.setColor(Color.WHITE);
         g2.drawString(this.mod.getName(), 10, 10);
         g2.setColor(this.mod.isOptional() ? Color.GREEN : Color.RED);
-        g2.drawString(this.mod.isOptional() ? "Optional" : "Required", g2.getFontMetrics().stringWidth(this.mod
-                .getName()) + g2.getFontMetrics().charWidth('M') * 2, 10);
+        g2.drawString(this.mod.isOptional() ? "Optional" : "Required",
+                g2.getFontMetrics().stringWidth(this.mod.getName()) + g2.getFontMetrics().charWidth('M') * 2, 10);
     }
 }

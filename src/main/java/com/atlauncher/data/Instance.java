@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,25 +26,39 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Writer;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
-import javax.swing.JOptionPane;
 
 import com.atlauncher.App;
+import com.atlauncher.FileSystem;
 import com.atlauncher.Gsons;
 import com.atlauncher.LogManager;
+import com.atlauncher.builders.HTMLBuilder;
+import com.atlauncher.data.curse.CurseFile;
+import com.atlauncher.data.curse.CurseMod;
+import com.atlauncher.data.json.Java;
+import com.atlauncher.data.minecraft.LoggingClient;
+import com.atlauncher.data.minecraft.loaders.LoaderVersion;
 import com.atlauncher.data.openmods.OpenEyeReportResponse;
+import com.atlauncher.exceptions.InvalidMinecraftVersion;
 import com.atlauncher.gui.dialogs.ProgressDialog;
+import com.atlauncher.managers.DialogManager;
 import com.atlauncher.mclauncher.MCLauncher;
-import com.atlauncher.utils.HTMLUtils;
+import com.atlauncher.network.Analytics;
+import com.atlauncher.utils.OS;
 import com.atlauncher.utils.Utils;
 
-import com.atlauncher.exceptions.InvalidMinecraftVersion;
+import org.mini2Dx.gettext.GetText;
+
+import net.arikia.dev.drpc.DiscordRPC;
+import net.arikia.dev.drpc.DiscordRichPresence;
 
 /**
  * This class handles contains information about a single Instance in the
@@ -94,6 +108,28 @@ public class Instance implements Cloneable {
     private String versionType;
 
     /**
+     * The java requirements for this instance.
+     */
+    private Java java;
+
+    /**
+     * If this version allows Curse mod integration.
+     */
+    private Boolean enableCurseIntegration = false;
+
+    /**
+     * If this version allows editing mods.
+     */
+    private Boolean enableEditingMods = true;
+
+    private Boolean assetsMapToResources = false;
+
+    /**
+     * The loader version chosen to be installed for this instance.
+     */
+    private LoaderVersion loaderVersion;
+
+    /**
      * The minimum RAM/memory recommended for this Instance by the pack developer/s.
      */
     private int memory = 0;
@@ -103,12 +139,6 @@ public class Instance implements Cloneable {
      * developer/s.
      */
     private int permgen = 0;
-
-    /**
-     * Comma separated list of the order of Jar's to be added to the class path when
-     * launching Minecraft.
-     */
-    private String jarOrder;
 
     /**
      * Array of paths for the libraries needed to be loaded.
@@ -152,6 +182,11 @@ public class Instance implements Cloneable {
     private String assets = null;
 
     /**
+     * The logging client used for Minecraft.
+     */
+    private LoggingClient logging = null;
+
+    /**
      * If this instance has been converted or not from the old format.
      */
     private boolean isConverted = false;
@@ -187,15 +222,6 @@ public class Instance implements Cloneable {
     private boolean isPlayable;
 
     /**
-     * If this instance uses the MCLauncher or the LegacyMCLauncher class to load
-     * Minecraft.
-     *
-     * @see com.atlauncher.mclauncher.MCLauncher
-     * @see com.atlauncher.mclauncher.LegacyMCLauncher
-     */
-    private boolean newLaunchMethod;
-
-    /**
      * List of DisableableMod objects for the mods in the Instance.
      *
      * @see com.atlauncher.data.DisableableMod
@@ -207,6 +233,8 @@ public class Instance implements Cloneable {
      * to not be reminded about updating to.
      */
     private List<String> ignoredUpdates;
+
+    private InstanceSettings settings = null;
 
     /**
      * Instantiates a new instance.
@@ -224,8 +252,6 @@ public class Instance implements Cloneable {
      * @param permgen            the minimum PermGen/Metaspace as recommended by the
      *                           pack developer/s
      * @param mods               the mods installed in this Instance
-     * @param jarOrder           the order that jar mods are loaded into the class
-     *                           path
      * @param libraries          the libraries needed to launch Minecraft
      * @param extraArguments     the extra arguments for launching the pack
      * @param minecraftArguments the arguments needed by Minecraft to run
@@ -233,13 +259,13 @@ public class Instance implements Cloneable {
      * @param assets             the assets version being used by Minecraft
      * @param isDev              if this Instance is using a dev version of the pack
      * @param isPlayable         if this instance is playable
-     * @param newLaunchMethod    if this instance is using the new launch method for
-     *                           Minecraft
+     * @param java               the java requirements for the instance
      */
     public Instance(String name, String pack, Pack realPack, boolean enableUserLock, String version,
             String minecraftVersion, String versionType, int memory, int permgen, List<DisableableMod> mods,
-            String jarOrder, List<String> libraries, String extraArguments, String minecraftArguments, String mainClass,
-            String assets, boolean isDev, boolean isPlayable, boolean newLaunchMethod) {
+            List<String> libraries, String extraArguments, String minecraftArguments, String mainClass, String assets,
+            boolean assetsMapToResources, LoggingClient logging, boolean isDev, boolean isPlayable, Java java,
+            boolean enableCurseIntegration, boolean enableEditingMods, LoaderVersion loaderVersion) {
         this.name = name;
         this.pack = pack;
         this.realPack = realPack;
@@ -249,16 +275,15 @@ public class Instance implements Cloneable {
         this.memory = memory;
         this.permgen = permgen;
         this.mods = mods;
-        this.jarOrder = jarOrder;
         this.libraries = libraries;
         this.mainClass = mainClass;
         this.assets = assets;
-        this.jarOrder = jarOrder;
+        this.assetsMapToResources = assetsMapToResources;
+        this.logging = logging;
         this.extraArguments = extraArguments;
         this.minecraftArguments = minecraftArguments;
         this.isDev = isDev;
         this.isPlayable = isPlayable;
-        this.newLaunchMethod = newLaunchMethod;
         if (enableUserLock && !App.settings.getAccount().isUUIDNull()) {
             this.userLock = App.settings.getAccount().getUUIDNoDashes();
         } else {
@@ -266,6 +291,10 @@ public class Instance implements Cloneable {
         }
         this.isConverted = true;
         this.usesNewLibraries = true;
+        this.java = java;
+        this.enableCurseIntegration = enableCurseIntegration;
+        this.enableEditingMods = enableEditingMods;
+        this.loaderVersion = loaderVersion;
     }
 
     /**
@@ -284,24 +313,22 @@ public class Instance implements Cloneable {
      * @param permgen            the minimum PermGen/Metaspace as recommended by the
      *                           pack developer/s
      * @param mods               the mods installed in this Instance
-     * @param jarOrder           the order that jar mods are loaded into the class
-     *                           path
      * @param libraries          the libraries needed to launch Minecraft
      * @param extraArguments     the extra arguments for launching the pack
      * @param minecraftArguments the arguments needed by Minecraft to run
      * @param mainClass          the main class to run when launching Minecraft
      * @param assets             the assets version being used by Minecraft
      * @param isDev              if this Instance is using a dev version of the pack
-     * @param newLaunchMethod    if this instance is using the new launch method for
-     *                           Minecraft
+     * @param java               the java requirements for the instance
      */
     public Instance(String name, String pack, Pack realPack, boolean enableUserLock, String version,
             String minecraftVersion, String versionType, int memory, int permgen, List<DisableableMod> mods,
-            String jarOrder, List<String> libraries, String extraArguments, String minecraftArguments, String mainClass,
-            String assets, boolean isDev, boolean newLaunchMethod) {
+            List<String> libraries, String extraArguments, String minecraftArguments, String mainClass, String assets,
+            boolean assetsMapToResources, LoggingClient logging, boolean isDev, Java java,
+            boolean enableCurseIntegration, boolean enableEditingMods, LoaderVersion loaderVersion) {
         this(name, pack, realPack, enableUserLock, version, minecraftVersion, versionType, memory, permgen, mods,
-                jarOrder, libraries, extraArguments, minecraftArguments, mainClass, assets, isDev, true,
-                newLaunchMethod);
+                libraries, extraArguments, minecraftArguments, mainClass, assets, assetsMapToResources, logging, isDev,
+                true, java, enableCurseIntegration, enableEditingMods, loaderVersion);
     }
 
     /**
@@ -353,27 +380,6 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Gets the order to load any jar mods into the class path when launching
-     * Minecraft.
-     *
-     * @return comma separated list of filenames to jar mods in their correct
-     *         loading order
-     */
-    public String getJarOrder() {
-        return this.jarOrder;
-    }
-
-    /**
-     * Sets the order to load the jars from the jarmods folder.
-     *
-     * @param jarOrder comma separated list of filenames for the order to load the
-     *                 mods from the jarmods folder
-     */
-    public void setJarOrder(String jarOrder) {
-        this.jarOrder = jarOrder;
-    }
-
-    /**
      * Gets the minimum recommended RAM/memory for this Instance based off what the
      * Pack specifies. Defaults to 0 if there is none specified by the pack. Value
      * is in MB.
@@ -412,7 +418,7 @@ public class Instance implements Cloneable {
      *         this instance or null if none
      */
     public List<DisableableMod> getInstalledSelectedMods() {
-        List<DisableableMod> mods = new ArrayList<DisableableMod>();
+        List<DisableableMod> mods = new ArrayList<>();
 
         for (DisableableMod mod : this.mods) {
             if (mod.wasSelected()) {
@@ -473,7 +479,7 @@ public class Instance implements Cloneable {
      */
     public ImageIcon getImage() {
         File customImage = new File(this.getRootDirectory(), "instance.png");
-        File instancesImage = new File(App.settings.getImagesDir(), getSafePackName().toLowerCase() + ".png");
+        File instancesImage = FileSystem.IMAGES.resolve(getSafePackName().toLowerCase() + ".png").toFile();
 
         if (customImage.exists()) {
             try {
@@ -490,7 +496,7 @@ public class Instance implements Cloneable {
             return Utils.getIconImage(instancesImage);
 
         } else {
-            return Utils.getIconImage(new File(App.settings.getImagesDir(), "defaultimage.png"));
+            return Utils.getIconImage(FileSystem.IMAGES.resolve("defaultimage.png").toFile());
         }
     }
 
@@ -505,7 +511,7 @@ public class Instance implements Cloneable {
         if (this.realPack != null) {
             return this.realPack.getDescription();
         } else {
-            return Language.INSTANCE.localize("pack.nodescription");
+            return GetText.tr("No Description");
         }
     }
 
@@ -566,7 +572,7 @@ public class Instance implements Cloneable {
      */
     public void ignoreUpdate() {
         if (this.ignoredUpdates == null) {
-            this.ignoredUpdates = new ArrayList<String>();
+            this.ignoredUpdates = new ArrayList<>();
         }
 
         String version;
@@ -623,7 +629,7 @@ public class Instance implements Cloneable {
                 List<DisableableMod> selectedMods = this.getInstalledSelectedMods();
 
                 if (selectedMods.size() == 0) {
-                    List<DisableableMod> mods = new ArrayList<DisableableMod>();
+                    List<DisableableMod> mods = new ArrayList<>();
 
                     for (DisableableMod mod : this.mods) {
                         mod.setWasSelected(true);
@@ -640,7 +646,7 @@ public class Instance implements Cloneable {
 
         // changes to the way libraries are saved and loaded from disk
         if (this.dataVersion < 2) {
-            this.libraries = new ArrayList<String>();
+            this.libraries = new ArrayList<>();
 
             if (this.librariesNeeded != null) {
                 for (String filePath : this.librariesNeeded.split(",")) {
@@ -662,6 +668,47 @@ public class Instance implements Cloneable {
     public void removeInstalledMod(DisableableMod mod) {
         Utils.delete((mod.isDisabled() ? mod.getDisabledFile(this) : mod.getFile(this)));
         this.mods.remove(mod); // Remove mod from mod List
+    }
+
+    /**
+     * Gets the java requirements for this instance.
+     *
+     * @return the java requirements for this instance
+     */
+    public Java getJava() {
+        return this.java;
+    }
+
+    public void setJava(Java newJava) {
+        this.java = newJava;
+    }
+
+    public boolean hasEnabledCurseIntegration() {
+        return this.enableCurseIntegration != null && this.enableCurseIntegration;
+    }
+
+    public void setEnableCurseIntegration(boolean enableCurseIntegration) {
+        this.enableCurseIntegration = enableCurseIntegration;
+    }
+
+    public boolean hasEnabledEditingMods() {
+        return this.enableEditingMods == null || this.enableEditingMods;
+    }
+
+    public void setEnableEditingMods(boolean enableEditingMods) {
+        this.enableEditingMods = enableEditingMods;
+    }
+
+    public boolean installedWithLoaderVersion() {
+        return this.loaderVersion != null;
+    }
+
+    public void setLoaderVersion(LoaderVersion loaderVersion) {
+        this.loaderVersion = loaderVersion;
+    }
+
+    public LoaderVersion getLoaderVersion() {
+        return this.loaderVersion;
     }
 
     /**
@@ -736,7 +783,7 @@ public class Instance implements Cloneable {
      * @return File object for the root directory of this Instance
      */
     public File getRootDirectory() {
-        return new File(App.settings.getInstancesDir(), getSafeName());
+        return FileSystem.INSTANCES.resolve(getSafeName()).toFile();
     }
 
     /**
@@ -746,7 +793,11 @@ public class Instance implements Cloneable {
      * @return File object for the assets directory used by Minecraft
      */
     public File getAssetsDir() {
-        return new File(App.settings.getVirtualAssetsDir(), getAssets());
+        if (this.assetsMapToResources != null && this.assetsMapToResources) {
+            return new File(getRootDirectory(), "resources");
+        }
+
+        return FileSystem.RESOURCES_VIRTUAL.resolve(this.assets).toFile();
     }
 
     /**
@@ -917,15 +968,6 @@ public class Instance implements Cloneable {
     }
 
     /**
-     * Checks if this Instance has installed jar mods.
-     *
-     * @return true if there are jar mods
-     */
-    public boolean hasJarMods() {
-        return this.jarOrder != null;
-    }
-
-    /**
      * Sets the minimum recommended PermGen/Metaspace size for this Instance in MB.
      *
      * @param permgen the minimum recommended PermGen/Metaspace for this Instance in
@@ -991,25 +1033,6 @@ public class Instance implements Cloneable {
      */
     public boolean isPlayable() {
         return this.isPlayable;
-    }
-
-    /**
-     * Sets the launch method used to launch this Instance.
-     *
-     * @param newLaunchMethod true if the new launch menthod should be used, false
-     *                        for the legacy launch method
-     */
-    public void setIsNewLaunchMethod(boolean newLaunchMethod) {
-        this.newLaunchMethod = newLaunchMethod;
-    }
-
-    /**
-     * Checks if this Instance uses the new launch method or not.
-     *
-     * @return true if this Instance uses the new launch method
-     */
-    public boolean isNewLaunchMethod() {
-        return this.newLaunchMethod;
     }
 
     /**
@@ -1163,6 +1186,26 @@ public class Instance implements Cloneable {
         this.assets = assets;
     }
 
+    public boolean doAssetsMapToResources() {
+        return this.assetsMapToResources;
+    }
+
+    public void setAssetsMapToResources(boolean assetsMapToResources) {
+        this.assetsMapToResources = assetsMapToResources;
+    }
+
+    public boolean hasLogging() {
+        return this.logging != null;
+    }
+
+    public LoggingClient getLogging() {
+        return this.logging;
+    }
+
+    public void setLogging(LoggingClient logging) {
+        this.logging = logging;
+    }
+
     /**
      * Checks if this Instance can be played. This refers only to the account and
      * permission side of things and doesn't reference if the instance is playable
@@ -1223,7 +1266,7 @@ public class Instance implements Cloneable {
                 // version of the Pack and that the latest version of the Pack is not restricted
                 // to
                 // disallow updates.
-                if (!this.realPack.getLatestVersion().getVersion().equalsIgnoreCase(this.version)
+                if (!this.realPack.getLatestVersion().version.equalsIgnoreCase(this.version)
                         && !this.realPack.isLatestVersionNoUpdate()) {
                     return true;
                 }
@@ -1250,13 +1293,13 @@ public class Instance implements Cloneable {
      */
     public String getLatestVersion() {
         return (this.realPack != null
-                ? (this.realPack.getLatestVersion() == null ? null : this.realPack.getLatestVersion().getVersion())
+                ? (this.realPack.getLatestVersion() == null ? null : this.realPack.getLatestVersion().version)
                 : null);
     }
 
     public String getLatestDevHash() {
         return (this.realPack != null
-                ? (this.realPack.getLatestDevVersion() == null ? null : this.realPack.getLatestDevVersion().getHash())
+                ? (this.realPack.getLatestDevVersion() == null ? null : this.realPack.getLatestDevVersion().hash)
                 : null);
     }
 
@@ -1312,35 +1355,39 @@ public class Instance implements Cloneable {
     public boolean launch() {
         final Account account = App.settings.getAccount();
         if (account == null) {
-            String[] options = { Language.INSTANCE.localize("common.ok") };
-            JOptionPane.showOptionDialog(App.settings.getParent(), Language.INSTANCE.localize("instance.noaccount"),
-                    Language.INSTANCE.localize("instance.noaccountselected"), JOptionPane.DEFAULT_OPTION,
-                    JOptionPane.ERROR_MESSAGE, null, options, options[0]);
+            DialogManager.okDialog().setTitle(GetText.tr("No Account Selected"))
+                    .setContent(GetText.tr("Cannot play instance as you have no account selected"))
+                    .setType(DialogManager.ERROR).show();
+
             App.settings.setMinecraftLaunched(false);
             return false;
         } else {
-            if ((App.settings.getMaximumMemory() < this.memory) && (this.memory <= Utils.getSafeMaximumRam())) {
-                String[] options = { Language.INSTANCE.localize("common.yes"),
-                        Language.INSTANCE.localize("common.no") };
-                int ret = JOptionPane.showOptionDialog(App.settings.getParent(),
-                        HTMLUtils.centerParagraph(Language.INSTANCE.localizeWithReplace("instance.insufficientram",
-                                "<b>" + this.memory + "</b> " + "MB<br/><br/>")),
-                        Language.INSTANCE.localize("instance.insufficientramtitle"), JOptionPane.DEFAULT_OPTION,
-                        JOptionPane.ERROR_MESSAGE, null, options, options[0]);
+            Integer maximumMemory = (this.settings == null || this.settings.getMaximumMemory() == null)
+                    ? App.settings.getMaximumMemory()
+                    : settings.getMaximumMemory();
+            if ((maximumMemory < this.memory) && (this.memory <= OS.getSafeMaximumRam())) {
+                int ret = DialogManager.optionDialog().setTitle(GetText.tr("Insufficient Ram"))
+                        .setContent(new HTMLBuilder().center().text(GetText.tr(
+                                "This pack has set a minimum amount of ram needed to <b>{0}</b> MB.<br/><br/>Do you want to continue loading the instance anyway?",
+                                this.memory)).build())
+                        .setLookAndFeel(DialogManager.YES_NO_OPTION).setType(DialogManager.ERROR)
+                        .setDefaultOption(DialogManager.YES_OPTION).show();
+
                 if (ret != 0) {
                     LogManager.warn("Launching of instance cancelled due to user cancelling memory warning!");
                     App.settings.setMinecraftLaunched(false);
                     return false;
                 }
             }
-            if (App.settings.getPermGen() < this.permgen) {
-                String[] options = { Language.INSTANCE.localize("common.yes"),
-                        Language.INSTANCE.localize("common.no") };
-                int ret = JOptionPane.showOptionDialog(App.settings.getParent(),
-                        HTMLUtils.centerParagraph(Language.INSTANCE.localizeWithReplace("instance.insufficientpermgen",
-                                "<b>" + this.permgen + "</b> " + "MB<br/><br/>")),
-                        Language.INSTANCE.localize("instance.insufficientpermgentitle"), JOptionPane.DEFAULT_OPTION,
-                        JOptionPane.ERROR_MESSAGE, null, options, options[0]);
+            Integer permGen = (this.settings == null || this.settings.getPermGen() == null) ? App.settings.getPermGen()
+                    : settings.getPermGen();
+            if (permGen < this.permgen) {
+                int ret = DialogManager.optionDialog().setTitle(GetText.tr("Insufficent Permgen"))
+                        .setContent(new HTMLBuilder().center().text(GetText.tr(
+                                "This pack has set a minimum amount of permgen to <b>{0}</b> MB.<br/><br/>Do you want to continue loading the instance anyway?",
+                                this.permgen)).build())
+                        .setLookAndFeel(DialogManager.YES_NO_OPTION).setType(DialogManager.ERROR)
+                        .setDefaultOption(DialogManager.YES_OPTION).show();
                 if (ret != 0) {
                     LogManager.warn("Launching of instance cancelled due to user cancelling permgen warning!");
                     App.settings.setMinecraftLaunched(false);
@@ -1349,14 +1396,12 @@ public class Instance implements Cloneable {
             }
 
             LogManager.info("Logging into Minecraft!");
-            final ProgressDialog dialog = new ProgressDialog(Language.INSTANCE.localize("account.loggingin"), 0,
-                    Language.INSTANCE.localize("account.loggingin"), "Aborted login to Minecraft!");
-            dialog.addThread(new Thread() {
-                public void run() {
-                    dialog.setReturnValue(account.login());
-                    dialog.close();
-                }
-            });
+            final ProgressDialog dialog = new ProgressDialog(GetText.tr("Logging Into Minecraft"), 0,
+                    GetText.tr("Logging Into Minecraft"), "Aborted login to Minecraft!");
+            dialog.addThread(new Thread(() -> {
+                dialog.setReturnValue(account.login());
+                dialog.close();
+            }));
             dialog.start();
 
             final LoginResponse session = (LoginResponse) dialog.getReturnValue();
@@ -1365,141 +1410,121 @@ public class Instance implements Cloneable {
                 return false;
             }
 
-            Thread launcher = new Thread() {
-                public void run() {
-                    try {
-                        long start = System.currentTimeMillis();
-                        if (App.settings.getParent() != null) {
-                            App.settings.getParent().setVisible(false);
-                        }
-                        // Create a note of worlds for auto backup if enabled
-                        HashMap<String, Long> preWorldList = new HashMap<String, Long>();
-                        if (App.settings.isAdvancedBackupsEnabled() && App.settings.getAutoBackup()) {
-                            if (getSavesDirectory().exists()) {
-                                File[] files = getSavesDirectory().listFiles();
-                                if (files != null) {
-                                    for (File file : files) {
-                                        if (file.isDirectory()) {
-                                            preWorldList.put(file.getName(), file.lastModified());
-                                        }
-                                    }
-                                }
-                            }
-                        }
+            Analytics.sendEvent(this.getPackName() + " - " + this.getVersion(), "Play", "Instance");
 
-                        LogManager.info("Launching pack " + getPackName() + " " + getVersion() + " for " + "Minecraft "
-                                + getMinecraftVersion());
-
-                        Process process = MCLauncher.launch(account, Instance.this, session);
-
-                        if (!App.settings.keepLauncherOpen() && !App.settings.enableLogs()) {
-                            System.exit(0);
-                        }
-
-                        App.settings.showKillMinecraft(process);
-                        InputStream is = process.getInputStream();
-                        InputStreamReader isr = new InputStreamReader(is);
-                        BufferedReader br = new BufferedReader(isr);
-                        String line;
-                        while ((line = br.readLine()) != null) {
-                            if (!LogManager.showDebug) {
-                                line = line.replace(account.getMinecraftUsername(), "**MINECRAFTUSERNAME**");
-                                line = line.replace(account.getUsername(), "**MINECRAFTUSERNAME**");
-                                if (account.hasAccessToken()) {
-                                    line = line.replace(account.getAccessToken(), "**ACCESSTOKEN**");
-                                }
-                                if (account.hasUUID()) {
-                                    line = line.replace(account.getUUID(), "**UUID**");
-                                }
-                            }
-                            LogManager.minecraft(line);
-                        }
-                        App.settings.hideKillMinecraft();
-                        if (App.settings.getParent() != null && App.settings.keepLauncherOpen()) {
-                            App.settings.getParent().setVisible(true);
-                        }
-                        long end = System.currentTimeMillis();
-                        if (App.settings.isInOfflineMode() && !App.forceOfflineMode) {
-                            App.settings.checkOnlineStatus();
-                        }
-                        int exitValue = 0; // Assume we exited fine
-                        try {
-                            exitValue = process.exitValue(); // Try to get the real exit value
-                        } catch (IllegalThreadStateException e) {
-                            process.destroy(); // Kill the process
-                        }
-                        if (!App.settings.keepLauncherOpen()) {
-                            App.settings.getConsole().setVisible(false); // Hide the console to pretend we've closed
-                        }
-                        if (exitValue != 0) {
-                            // Submit any pending crash reports from Open Eye if need to since we
-                            // exited abnormally
-                            if (App.settings.enableLogs() && App.settings.enableOpenEyeReporting()) {
-                                App.TASKPOOL.submit(new Runnable() {
-                                    public void run() {
-                                        sendOpenEyePendingReports();
-                                    }
-                                });
-                            }
-                        } else if (App.settings.isAdvancedBackupsEnabled() && App.settings.getAutoBackup()) {
-                            // Begin backup
-                            if (getSavesDirectory().exists()) {
-                                File[] files = getSavesDirectory().listFiles();
-                                if (files != null) {
-                                    for (File file : files) {
-                                        if ((file.isDirectory()) && (!file.getName().equals("NEI"))) {
-                                            if (preWorldList.containsKey(file.getName())) {
-                                                // Only backup if file changed
-                                                if (!(preWorldList.get(file.getName()) == file.lastModified())) {
-                                                    SyncAbstract sync = SyncAbstract.syncList
-                                                            .get(App.settings.getLastSelectedSync());
-                                                    sync.backupWorld(
-                                                            file.getName() + String.valueOf(file.lastModified()), file,
-                                                            Instance.this);
-                                                }
-                                            }
-                                            // Or backup if a new file is found
-                                            else {
-                                                SyncAbstract sync = SyncAbstract.syncList
-                                                        .get(App.settings.getLastSelectedSync());
-                                                sync.backupWorld(
-                                                        file.getName()
-                                                                + String.valueOf(file.lastModified()).replace(":", ""),
-                                                        file, Instance.this);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        App.settings.setMinecraftLaunched(false);
-                        if (!App.settings.isInOfflineMode()) {
-                            if (isLeaderboardsEnabled() && isLoggingEnabled() && !isDev()
-                                    && App.settings.enableLogs()) {
-                                final int timePlayed = (int) (end - start) / 1000;
-                                if (timePlayed > 0) {
-                                    App.TASKPOOL.submit(new Runnable() {
-                                        public void run() {
-                                            addTimePlayed(timePlayed, (isDev ? "dev" : getVersion()));
-                                        }
-                                    });
-                                }
-                            }
-                            if (App.settings.keepLauncherOpen() && App.settings.hasUpdatedFiles())
-
-                            {
-                                App.settings.reloadLauncherData();
-                            }
-                        }
-                        if (!App.settings.keepLauncherOpen()) {
-                            System.exit(0);
-                        }
-                    } catch (IOException e1) {
-                        LogManager.logStackTrace(e1);
+            Thread launcher = new Thread(() -> {
+                try {
+                    long start = System.currentTimeMillis();
+                    if (App.settings.getParent() != null) {
+                        App.settings.getParent().setVisible(false);
                     }
+
+                    LogManager.info("Launching pack " + getPackName() + " " + getVersion() + " for " + "Minecraft "
+                            + getMinecraftVersion());
+
+                    Process process = MCLauncher.launch(account, Instance.this, session);
+
+                    if (!App.settings.keepLauncherOpen() && !App.settings.enableLogs()) {
+                        System.exit(0);
+                    }
+
+                    if (App.settings.enableDiscordIntegration() && App.discordInitialized
+                            && this.getRealPack() != null) {
+                        String playing = this.getRealPack().getName() + " (" + this.getVersion() + ")";
+
+                        DiscordRichPresence.Builder presence = new DiscordRichPresence.Builder("");
+                        presence.setDetails(playing);
+                        presence.setStartTimestamps(System.currentTimeMillis());
+
+                        if (this.getRealPack().hasDiscordImage()) {
+                            presence.setBigImage(this.getRealPack().getSafeName().toLowerCase(), playing);
+                            presence.setSmallImage("atlauncher", "ATLauncher");
+                        } else {
+                            presence.setBigImage("atlauncher", playing);
+                        }
+
+                        DiscordRPC.discordUpdatePresence(presence.build());
+                    }
+
+                    App.settings.showKillMinecraft(process);
+                    InputStream is = process.getInputStream();
+                    InputStreamReader isr = new InputStreamReader(is);
+                    BufferedReader br = new BufferedReader(isr);
+                    String line;
+                    int detectedError = 0;
+
+                    while ((line = br.readLine()) != null) {
+                        if (line.contains("java.lang.OutOfMemoryError")
+                                || line.contains("There is insufficient memory for the Java Runtime Environment")) {
+                            detectedError = MinecraftError.OUT_OF_MEMORY;
+                        }
+
+                        if (line.contains("java.util.ConcurrentModificationException")
+                                && Utils.matchVersion(Instance.this.getMinecraftVersion(), "1.6", true, true)) {
+                            detectedError = MinecraftError.CONCURRENT_MODIFICATION_ERROR_1_6;
+                        }
+
+                        if (!LogManager.showDebug) {
+                            line = line.replace(account.getMinecraftUsername(), "**MINECRAFTUSERNAME**");
+                            line = line.replace(account.getUsername(), "**MINECRAFTUSERNAME**");
+                            if (account.hasAccessToken()) {
+                                line = line.replace(account.getAccessToken(), "**ACCESSTOKEN**");
+                            }
+                            if (account.hasUUID()) {
+                                line = line.replace(account.getUUID(), "**UUID**");
+                            }
+                        }
+                        LogManager.minecraft(line);
+                    }
+                    App.settings.hideKillMinecraft();
+                    if (App.settings.getParent() != null && App.settings.keepLauncherOpen()) {
+                        App.settings.getParent().setVisible(true);
+                    }
+                    long end = System.currentTimeMillis();
+                    if (App.settings.enableDiscordIntegration()) {
+                        DiscordRPC.discordClearPresence();
+                    }
+                    int exitValue = 0; // Assume we exited fine
+                    try {
+                        exitValue = process.exitValue(); // Try to get the real exit value
+                    } catch (IllegalThreadStateException e) {
+                        process.destroy(); // Kill the process
+                    }
+                    if (!App.settings.keepLauncherOpen()) {
+                        App.console.setVisible(false); // Hide the console to pretend
+                                                       // we've closed
+                    }
+                    if (exitValue != 0) {
+                        // Submit any pending crash reports from Open Eye if need to since we
+                        // exited abnormally
+                        if (App.settings.enableLogs() && App.settings.enableOpenEyeReporting()) {
+                            App.TASKPOOL.submit(this::sendOpenEyePendingReports);
+                        }
+                    }
+
+                    if (detectedError != 0) {
+                        MinecraftError.showInformationPopup(detectedError);
+                    }
+
+                    App.settings.setMinecraftLaunched(false);
+                    if (isLeaderboardsEnabled() && isLoggingEnabled() && !isDev() && App.settings.enableLogs()) {
+                        final int timePlayed = (int) (end - start) / 1000;
+                        if (timePlayed > 0) {
+                            App.TASKPOOL.submit(() -> {
+                                addTimePlayed(timePlayed, (isDev ? "dev" : getVersion()));
+                            });
+                        }
+                    }
+                    if (App.settings.keepLauncherOpen() && App.settings.checkForUpdatedFiles()) {
+                        App.settings.reloadLauncherData();
+                    }
+                    if (!App.settings.keepLauncherOpen()) {
+                        System.exit(0);
+                    }
+                } catch (IOException e1) {
+                    LogManager.logStackTrace(e1);
                 }
-            };
+            });
             launcher.start();
             return true;
         }
@@ -1525,18 +1550,18 @@ public class Instance implements Cloneable {
                     // OpenEye returned a response to the report, display that to user if needed.
                     LogManager.info("OpenEye: Pending crash report sent! URL: " + response.getURL());
                     if (response.hasNote()) {
-                        String[] options = { Language.INSTANCE.localize("common.opencrashreport"),
-                                Language.INSTANCE.localize("common.ok") };
-                        int ret = JOptionPane
-                                .showOptionDialog(App.settings.getParent(),
-                                        HTMLUtils.centerParagraph(Language.INSTANCE.localizeWithReplace(
-                                                "instance.openeyereport1", "<br/><br/>") + response.getNoteDisplay()
-                                                + Language.INSTANCE.localize("instance" + ".openeyereport2")),
-                                        Language.INSTANCE.localize("instance.aboutyourcrash"),
-                                        JOptionPane.DEFAULT_OPTION, JOptionPane.INFORMATION_MESSAGE, null, options,
-                                        options[1]);
+                        int ret = DialogManager.optionDialog().setTitle(GetText.tr("About Your Crash"))
+                                .setContent(new HTMLBuilder().center().text(GetText.tr(
+                                        "We detected a previous unreported crash generated by the OpenEye mod.<br/><br/>This has now been sent off to OpenEye and you can open the crash report below or continue without viewing it.")
+                                        + "<br/><br/>" + response.getNoteDisplay()
+                                        + GetText.tr(
+                                                "You can turn this off by unchecking the OpenEye Reporting setting in the Settings tab. Click Ok to continue."))
+                                        .build())
+                                .setType(DialogManager.INFO).addOption(GetText.tr("Open Crash Report"))
+                                .addOption(GetText.tr("Ok"), true).show();
+
                         if (ret == 0) {
-                            Utils.openBrowser(response.getURL());
+                            OS.openWebBrowser(response.getURL());
                         }
                     }
                 }
@@ -1546,7 +1571,7 @@ public class Instance implements Cloneable {
     }
 
     public String addTimePlayed(int time, String version) {
-        Map<String, Object> request = new HashMap<String, Object>();
+        Map<String, Object> request = new HashMap<>();
 
         if (App.settings.enableLeaderboards()) {
             request.put("username", App.settings.getAccount().getMinecraftUsername());
@@ -1572,14 +1597,14 @@ public class Instance implements Cloneable {
      */
     public Instance clone() {
         Instance clone;
-        if (!this.userLock.equals(null)) {
+        if (this.userLock != null) {
             clone = new Instance(name, pack, realPack, true, version, minecraftVersion, versionType, memory, permgen,
-                    mods, jarOrder, libraries, extraArguments, minecraftArguments, mainClass, assets, isDev, isPlayable,
-                    newLaunchMethod);
+                    mods, libraries, extraArguments, minecraftArguments, mainClass, assets, assetsMapToResources,
+                    logging, isDev, isPlayable, java, enableCurseIntegration, enableEditingMods, loaderVersion);
         } else {
             clone = new Instance(name, pack, realPack, false, version, minecraftVersion, versionType, memory, permgen,
-                    mods, jarOrder, libraries, extraArguments, minecraftArguments, mainClass, assets, isDev, isPlayable,
-                    newLaunchMethod);
+                    mods, libraries, extraArguments, minecraftArguments, mainClass, assets, assetsMapToResources,
+                    logging, isDev, isPlayable, java, enableCurseIntegration, enableEditingMods, loaderVersion);
         }
         return clone;
     }
@@ -1594,7 +1619,7 @@ public class Instance implements Cloneable {
     }
 
     public List<String> getCustomMods(Type type) {
-        List<String> customMods = new ArrayList<String>();
+        List<String> customMods = new ArrayList<>();
         for (DisableableMod mod : this.mods) {
             if (mod.isUserAdded() && mod.getType() == type) {
                 customMods.add(mod.getFilename());
@@ -1603,8 +1628,13 @@ public class Instance implements Cloneable {
         return customMods;
     }
 
+    public List<String> getPackMods(Type type) {
+        return this.mods.stream().filter(dm -> !dm.userAdded && dm.type == type).map(DisableableMod::getFilename)
+                .collect(Collectors.toList());
+    }
+
     public List<DisableableMod> getCustomDisableableMods() {
-        List<DisableableMod> customMods = new ArrayList<DisableableMod>();
+        List<DisableableMod> customMods = new ArrayList<>();
         for (DisableableMod mod : this.mods) {
             if (mod.isUserAdded()) {
                 customMods.add(mod);
@@ -1620,8 +1650,7 @@ public class Instance implements Cloneable {
     public void save(boolean showToast) {
         Writer writer;
         try {
-            writer = new FileWriter(
-                    new File(new File(App.settings.getInstancesDir(), this.getSafeName()), "instance.json"));
+            writer = new FileWriter(FileSystem.INSTANCES.resolve(this.getSafeName() + "/instance.json").toFile());
         } catch (IOException e) {
             LogManager.logStackTrace("Failed to open instance.json for writing", e);
             return;
@@ -1632,7 +1661,8 @@ public class Instance implements Cloneable {
             writer.flush();
 
             if (showToast) {
-                App.TOASTER.pop("Instance " + this.getName());
+                // #. {0} is the name of the instance
+                App.TOASTER.pop(GetText.tr("Instance {0} Saved!", this.getName()));
             }
         } catch (IOException e) {
             LogManager.logStackTrace("Failed to write instance.json", e);
@@ -1646,7 +1676,7 @@ public class Instance implements Cloneable {
     }
 
     public ArrayList<String> getInstalledOptionalModNames() {
-        ArrayList<String> installedOptionalMods = new ArrayList<String>();
+        ArrayList<String> installedOptionalMods = new ArrayList<>();
 
         for (DisableableMod mod : this.getInstalledMods()) {
             if (mod.isOptional() && !mod.isUserAdded()) {
@@ -1658,12 +1688,12 @@ public class Instance implements Cloneable {
     }
 
     public Map<String, Object> getShareCodeData() {
-        Map<String, Object> data = new HashMap<String, Object>();
-        Map<String, Object> mods = new HashMap<String, Object>();
-        List<Map<String, Object>> optional = new ArrayList<Map<String, Object>>();
+        Map<String, Object> data = new HashMap<>();
+        Map<String, Object> mods = new HashMap<>();
+        List<Map<String, Object>> optional = new ArrayList<>();
 
         for (String mod : this.getInstalledOptionalModNames()) {
-            Map<String, Object> modInfo = new HashMap<String, Object>();
+            Map<String, Object> modInfo = new HashMap<>();
             modInfo.put("name", mod);
             modInfo.put("selected", true);
             optional.add(modInfo);
@@ -1673,5 +1703,75 @@ public class Instance implements Cloneable {
         data.put("mods", mods);
 
         return data;
+    }
+
+    public InstanceSettings getSettings() {
+        if (this.settings == null) {
+            this.settings = new InstanceSettings();
+        }
+
+        return this.settings;
+    }
+
+    public void setSettings(InstanceSettings settings) {
+        this.settings = settings;
+    }
+
+    public void addFileFromCurse(CurseMod mod, CurseFile file) {
+        Path downloadLocation = FileSystem.DOWNLOADS.resolve(file.fileName);
+        File finalLocation = new File(mod.categorySection.gameCategoryId == Constants.CURSE_RESOURCE_PACKS_SECTION_ID
+                ? this.getResourcePacksDirectory()
+                : (mod.categorySection.gameCategoryId == Constants.CURSE_WORLDS_SECTION_ID
+                        ? FileSystem.DOWNLOADS.toFile()
+                        : this.getModsDirectory()),
+                file.fileName);
+        com.atlauncher.network.Download download = com.atlauncher.network.Download.build().setUrl(file.downloadUrl)
+                .downloadTo(downloadLocation).size(file.fileLength);
+
+        if (mod.categorySection.gameCategoryId == Constants.CURSE_WORLDS_SECTION_ID) {
+            download = download.unzipTo(this.getSavesDirectory().toPath());
+        } else {
+            download = download.copyTo(finalLocation.toPath());
+
+            if (finalLocation.exists()) {
+                Utils.delete(finalLocation);
+            }
+        }
+
+        if (download.needToDownload()) {
+            try {
+                download.downloadFile();
+            } catch (IOException e) {
+                LogManager.logStackTrace(e);
+                DialogManager.okDialog().setType(DialogManager.ERROR).setTitle("Failed to download")
+                        .setContent("Failed to download " + file.fileName + ". Please try again later.").show();
+                return;
+            }
+        } else {
+            download.copy();
+        }
+
+        // find mods with the same curse mod id
+        List<DisableableMod> sameMods = this.mods.stream()
+                .filter(installedMod -> installedMod.isFromCurse() && installedMod.getCurseModId() == mod.id)
+                .collect(Collectors.toList());
+
+        // delete mod files that are the same mod id
+        sameMods.stream().forEach(disableableMod -> Utils.delete(disableableMod.getFile(this)));
+
+        // remove any mods that are from the same mod on Curse from the master mod list
+        this.mods = this.mods.stream()
+                .filter(installedMod -> !installedMod.isFromCurse() || installedMod.getCurseModId() != mod.id)
+                .collect(Collectors.toList());
+
+        // add this mod
+        this.mods.add(new DisableableMod(mod.name, file.displayName, true, file.fileName,
+                mod.categorySection.gameCategoryId == Constants.CURSE_RESOURCE_PACKS_SECTION_ID ? Type.resourcepack
+                        : (mod.categorySection.gameCategoryId == Constants.CURSE_WORLDS_SECTION_ID ? Type.worlds : Type.mods),
+                null, mod.summary, false, true, true, mod.id, file.id));
+
+        this.save(false);
+
+        App.TOASTER.pop(mod.name + " " + GetText.tr("Installed"));
     }
 }

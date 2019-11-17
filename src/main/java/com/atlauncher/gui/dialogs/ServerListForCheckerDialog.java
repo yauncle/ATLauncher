@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,9 +17,12 @@
  */
 package com.atlauncher.gui.dialogs;
 
-import com.atlauncher.data.Language;
-import com.atlauncher.gui.tabs.ServersForCheckerTab;
-import com.atlauncher.utils.Utils;
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -31,12 +34,11 @@ import javax.swing.JTabbedPane;
 import javax.swing.border.BevelBorder;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
+
+import com.atlauncher.gui.tabs.ServersForCheckerTab;
+import com.atlauncher.utils.Utils;
+
+import org.mini2Dx.gettext.GetText;
 
 public class ServerListForCheckerDialog extends JDialog implements ActionListener, ListSelectionListener {
     /**
@@ -45,17 +47,17 @@ public class ServerListForCheckerDialog extends JDialog implements ActionListene
     private static final long serialVersionUID = -1462218261978353036L;
 
     private final JTabbedPane TABBED_PANE = new JTabbedPane(JTabbedPane.TOP);
-    private final JButton ADD_BUTTON = new JButton(Language.INSTANCE.localize("common.add"));
-    private final JButton CLOSE_BUTTON = new JButton(Language.INSTANCE.localize("common.close"));
-    private final JButton DELETE_BUTTON = new JButton(Language.INSTANCE.localize("common.delete"));
-    private final JButton EDIT_BUTTON = new JButton(Language.INSTANCE.localize("common.edit"));
+    private final JButton ADD_BUTTON = new JButton(GetText.tr("Add"));
+    private final JButton CLOSE_BUTTON = new JButton(GetText.tr("Close"));
+    private final JButton DELETE_BUTTON = new JButton(GetText.tr("Delete"));
+    private final JButton EDIT_BUTTON = new JButton(GetText.tr("Edit"));
 
     private final ServersForCheckerTab SERVERS_TAB = new ServersForCheckerTab();
 
     private final JPanel BOTTOM_PANEL = new JPanel();
 
     public ServerListForCheckerDialog() {
-        super(null, Language.INSTANCE.localize("tools.serverchecker"), ModalityType.APPLICATION_MODAL);
+        super(null, GetText.tr("Server Checker"), ModalityType.APPLICATION_MODAL);
         setSize(400, 500);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
@@ -64,7 +66,7 @@ public class ServerListForCheckerDialog extends JDialog implements ActionListene
         setResizable(false);
         TABBED_PANE.setBorder(BorderFactory.createBevelBorder(BevelBorder.LOWERED));
 
-        TABBED_PANE.addTab(Language.INSTANCE.localize("tools.serverchecker.servers"), SERVERS_TAB);
+        TABBED_PANE.addTab(GetText.tr("Servers"), SERVERS_TAB);
 
         SERVERS_TAB.addListSelectionListener(this);
 

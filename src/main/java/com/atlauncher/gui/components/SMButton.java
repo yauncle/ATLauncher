@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,20 +15,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package com.atlauncher.gui.components;
 
-import com.atlauncher.App;
-import com.atlauncher.gui.CustomLineBorder;
-import com.atlauncher.utils.Utils;
+import java.awt.Cursor;
 
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JToolTip;
 import javax.swing.border.Border;
-import java.awt.Cursor;
 
+import com.atlauncher.App;
+import com.atlauncher.gui.CustomLineBorder;
+import com.atlauncher.utils.Utils;
+
+@SuppressWarnings("serial")
 public class SMButton extends JButton {
     private static final Cursor hand = new Cursor(Cursor.HAND_CURSOR);
 

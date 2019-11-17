@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,21 +17,11 @@
  */
 package com.atlauncher.gui.components;
 
-import com.atlauncher.App;
-import com.atlauncher.data.Account;
-import com.atlauncher.data.Language;
-import com.atlauncher.data.Status;
-import com.atlauncher.evnt.listener.ConsoleCloseListener;
-import com.atlauncher.evnt.listener.ConsoleOpenListener;
-import com.atlauncher.evnt.listener.RelocalizationListener;
-import com.atlauncher.evnt.manager.ConsoleCloseManager;
-import com.atlauncher.evnt.manager.ConsoleOpenManager;
-import com.atlauncher.evnt.manager.RelocalizationManager;
-import com.atlauncher.gui.AccountsDropDownRenderer;
-import com.atlauncher.gui.CustomLineBorder;
-import com.atlauncher.gui.dialogs.GithubIssueReporterDialog;
-import com.atlauncher.gui.dialogs.ProgressDialog;
-import com.atlauncher.utils.Utils;
+import java.awt.BorderLayout;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.awt.event.ItemEvent;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -39,24 +29,27 @@ import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JToolTip;
-import javax.swing.SwingUtilities;
 import javax.swing.border.Border;
-import java.awt.BorderLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
 
-/**
- * TODO: Rewrite with the other @link BottomBar classes
- */
+import com.atlauncher.App;
+import com.atlauncher.FileSystem;
+import com.atlauncher.data.Account;
+import com.atlauncher.data.Status;
+import com.atlauncher.evnt.listener.RelocalizationListener;
+import com.atlauncher.evnt.manager.ConsoleCloseManager;
+import com.atlauncher.evnt.manager.ConsoleOpenManager;
+import com.atlauncher.evnt.manager.RelocalizationManager;
+import com.atlauncher.gui.AccountsDropDownRenderer;
+import com.atlauncher.gui.CustomLineBorder;
+import com.atlauncher.gui.dialogs.ProgressDialog;
+import com.atlauncher.network.Analytics;
+import com.atlauncher.utils.OS;
+import com.atlauncher.utils.Utils;
+
+import org.mini2Dx.gettext.GetText;
 
 @SuppressWarnings("serial")
 public class LauncherBottomBar extends BottomBar implements RelocalizationListener {
-    private final JButton submitError = new JButton("Submit Bug");
     private JPanel leftSide;
     private JPanel middle;
     private Account fillerAccount;
@@ -69,18 +62,6 @@ public class LauncherBottomBar extends BottomBar implements RelocalizationListen
     private JLabel statusIcon;
 
     public LauncherBottomBar() {
-        submitError.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                SwingUtilities.invokeLater(new Runnable() {
-                    @Override
-                    public void run() {
-                        new GithubIssueReporterDialog(null).setVisible(true);
-                    }
-                });
-            }
-        });
-
         leftSide = new JPanel();
         leftSide.setLayout(new GridBagLayout());
         middle = new JPanel();
@@ -98,8 +79,6 @@ public class LauncherBottomBar extends BottomBar implements RelocalizationListen
         leftSide.add(openFolder, gbc);
         gbc.gridx++;
         leftSide.add(updateData, gbc);
-        // gbc.gridx++;
-        // leftSide.add(submitError, gbc);
 
         gbc.gridx = 0;
         gbc.gridy = GridBagConstraints.RELATIVE;
@@ -117,71 +96,48 @@ public class LauncherBottomBar extends BottomBar implements RelocalizationListen
      * Sets up the listeners on the buttons
      */
     private void setupListeners() {
-        toggleConsole.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                App.settings.getConsole().setVisible(!App.settings.isConsoleVisible());
-            }
+        toggleConsole.addActionListener(e -> App.console.setVisible(!App.console.isVisible()));
+        openFolder.addActionListener(e -> OS.openFileExplorer(FileSystem.BASE_DIR));
+        updateData.addActionListener(e -> {
+            final ProgressDialog dialog = new ProgressDialog(GetText.tr("Checking For Updated"), 0,
+                    GetText.tr("Checking For Updates"), "Aborting Update Check!");
+            dialog.addThread(new Thread(() -> {
+                Analytics.sendEvent("UpdateData", "Launcher");
+                if (App.settings.checkForUpdatedFiles()) {
+                    App.settings.reloadLauncherData();
+                }
+                dialog.close();
+            }));
+            dialog.start();
         });
-        openFolder.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                Utils.openExplorer(App.settings.getBaseDir());
-            }
-        });
-        updateData.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                final ProgressDialog dialog = new ProgressDialog(Language.INSTANCE.localize("common" + "" +
-                        ".checkingforupdates"), 0, Language.INSTANCE.localize("common.checkingforupdates"), "Aborting" +
-                        " Update Check!");
-                dialog.addThread(new Thread() {
-                    public void run() {
-                        if (App.settings.hasUpdatedFiles()) {
-                            App.settings.reloadLauncherData();
-                        }
-                        dialog.close();
-                    }
-                });
-                dialog.start();
-            }
-        });
-        username.addItemListener(new ItemListener() {
-            public void itemStateChanged(ItemEvent e) {
-                if (e.getStateChange() == ItemEvent.SELECTED) {
-                    if (!dontSave) {
-                        App.settings.switchAccount((Account) username.getSelectedItem());
-                    }
+        username.addItemListener(e -> {
+            if (e.getStateChange() == ItemEvent.SELECTED) {
+                if (!dontSave) {
+                    Analytics.sendEvent("Switch", "Account");
+                    App.settings.switchAccount((Account) username.getSelectedItem());
                 }
             }
         });
-        ConsoleCloseManager.addListener(new ConsoleCloseListener() {
-            @Override
-            public void onConsoleClose() {
-                toggleConsole.setText(Language.INSTANCE.localize("console.show"));
-            }
-        });
-        ConsoleOpenManager.addListener(new ConsoleOpenListener() {
-            @Override
-            public void onConsoleOpen() {
-                toggleConsole.setText(Language.INSTANCE.localize("console.hide"));
-            }
-        });
+        ConsoleCloseManager.addListener(() -> toggleConsole.setText(GetText.tr("Show Console")));
+        ConsoleOpenManager.addListener(() -> toggleConsole.setText(GetText.tr("Hide Console")));
     }
 
     /**
      * Creates the JButton's for use in the bar
      */
     private void createButtons() {
-        if (App.settings.isConsoleVisible()) {
-            toggleConsole = new JButton(Language.INSTANCE.localize("console.hide"));
+        if (App.console.isVisible()) {
+            toggleConsole = new JButton(GetText.tr("Hide Console"));
         } else {
-            toggleConsole = new JButton(Language.INSTANCE.localize("console.show"));
+            toggleConsole = new JButton(GetText.tr("Show Console"));
         }
 
-        openFolder = new JButton(Language.INSTANCE.localize("common.openfolder"));
-        updateData = new JButton(Language.INSTANCE.localize("common.updatedata"));
+        openFolder = new JButton(GetText.tr("Open Folder"));
+        updateData = new JButton(GetText.tr("Update Data"));
 
-        username = new JComboBox<Account>();
+        username = new JComboBox<>();
         username.setRenderer(new AccountsDropDownRenderer());
-        fillerAccount = new Account(Language.INSTANCE.localize("account.select"));
+        fillerAccount = new Account(GetText.tr("Select An Account"));
         username.addItem(fillerAccount);
         for (Account account : App.settings.getAccounts()) {
             username.addItem(account);
@@ -202,7 +158,7 @@ public class LauncherBottomBar extends BottomBar implements RelocalizationListen
             }
         };
         statusIcon.setBorder(BorderFactory.createEmptyBorder());
-        statusIcon.setToolTipText(Language.INSTANCE.localize("status.minecraft.checking"));
+        statusIcon.setToolTipText(GetText.tr("Checking Minecraft server status..."));
     }
 
     /**
@@ -212,24 +168,24 @@ public class LauncherBottomBar extends BottomBar implements RelocalizationListen
      */
     public void updateStatus(Status status) {
         switch (status) {
-            case UNKNOWN:
-                statusIcon.setToolTipText(Language.INSTANCE.localize("status.minecraft.checking"));
-                statusIcon.setIcon(Utils.getIconImage("/assets/image/StatusWhite.png"));
-                break;
-            case ONLINE:
-                statusIcon.setToolTipText(Language.INSTANCE.localize("status.minecraft.online"));
-                statusIcon.setIcon(Utils.getIconImage("/assets/image/StatusGreen.png"));
-                break;
-            case OFFLINE:
-                statusIcon.setToolTipText(Language.INSTANCE.localize("status.minecraft.offline"));
-                statusIcon.setIcon(Utils.getIconImage("/assets/image/StatusRed.png"));
-                break;
-            case PARTIAL:
-                statusIcon.setToolTipText(Language.INSTANCE.localize("status.minecraft.partial"));
-                statusIcon.setIcon(Utils.getIconImage("/assets/image/StatusYellow.png"));
-                break;
-            default:
-                break;
+        case UNKNOWN:
+            statusIcon.setToolTipText(GetText.tr("Checking Minecraft server status..."));
+            statusIcon.setIcon(Utils.getIconImage("/assets/image/StatusWhite.png"));
+            break;
+        case ONLINE:
+            statusIcon.setToolTipText(GetText.tr("All Minecraft servers are up!"));
+            statusIcon.setIcon(Utils.getIconImage("/assets/image/StatusGreen.png"));
+            break;
+        case OFFLINE:
+            statusIcon.setToolTipText(GetText.tr("Minecraft servers are down!"));
+            statusIcon.setIcon(Utils.getIconImage("/assets/image/StatusRed.png"));
+            break;
+        case PARTIAL:
+            statusIcon.setToolTipText(GetText.tr("Some Minecraft servers are down!"));
+            statusIcon.setIcon(Utils.getIconImage("/assets/image/StatusYellow.png"));
+            break;
+        default:
+            break;
         }
     }
 
@@ -250,13 +206,13 @@ public class LauncherBottomBar extends BottomBar implements RelocalizationListen
 
     @Override
     public void onRelocalization() {
-        if (App.settings.getConsole().isVisible()) {
-            toggleConsole.setText(Language.INSTANCE.localize("console.hide"));
+        if (App.console.isVisible()) {
+            toggleConsole.setText(GetText.tr("Hide Console"));
         } else {
-            toggleConsole.setText(Language.INSTANCE.localize("console.show"));
+            toggleConsole.setText(GetText.tr("Show Console"));
         }
-        this.updateData.setText(Language.INSTANCE.localize("common.updatedata"));
-        this.openFolder.setText(Language.INSTANCE.localize("common.openfolder"));
-        this.fillerAccount.setMinecraftUsername(Language.INSTANCE.localize("account.select"));
+        this.updateData.setText(GetText.tr("Update Data"));
+        this.openFolder.setText(GetText.tr("Open Folder"));
+        this.fillerAccount.setMinecraftUsername(GetText.tr("Select An Account"));
     }
 }

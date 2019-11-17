@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,39 +17,42 @@
  */
 package com.atlauncher.gui.tabs;
 
+import java.awt.BorderLayout;
+import java.util.Arrays;
+import java.util.List;
+
+import javax.swing.JButton;
+import javax.swing.JPanel;
+import javax.swing.JTabbedPane;
+
 import com.atlauncher.App;
-import com.atlauncher.data.Language;
 import com.atlauncher.evnt.listener.RelocalizationListener;
 import com.atlauncher.evnt.manager.RelocalizationManager;
 import com.atlauncher.evnt.manager.SettingsManager;
+import com.atlauncher.gui.tabs.settings.BackupsSettingsTab;
 import com.atlauncher.gui.tabs.settings.GeneralSettingsTab;
 import com.atlauncher.gui.tabs.settings.JavaSettingsTab;
 import com.atlauncher.gui.tabs.settings.LoggingSettingsTab;
 import com.atlauncher.gui.tabs.settings.NetworkSettingsTab;
 import com.atlauncher.gui.tabs.settings.ToolsSettingsTab;
+import com.atlauncher.network.Analytics;
+import com.atlauncher.utils.OS;
 
-import javax.swing.JButton;
-import javax.swing.JPanel;
-import javax.swing.JTabbedPane;
-import java.awt.BorderLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.util.Arrays;
-import java.util.List;
+import org.mini2Dx.gettext.GetText;
 
 @SuppressWarnings("serial")
 public class SettingsTab extends JPanel implements Tab, RelocalizationListener {
-
     private final GeneralSettingsTab generalSettingsTab = new GeneralSettingsTab();
     private final JavaSettingsTab javaSettingsTab = new JavaSettingsTab();
     private final NetworkSettingsTab networkSettingsTab = new NetworkSettingsTab();
     private final LoggingSettingsTab loggingSettingsTab = new LoggingSettingsTab();
     private final ToolsSettingsTab toolsSettingsTab = new ToolsSettingsTab();
-    private final List<Tab> tabs = Arrays.asList(new Tab[]{this.generalSettingsTab, this.javaSettingsTab, this
-            .networkSettingsTab, this.loggingSettingsTab, this.toolsSettingsTab});
+    private final BackupsSettingsTab backupsSettingsTab = new BackupsSettingsTab();
+    private final List<Tab> tabs = Arrays.asList(new Tab[] { this.generalSettingsTab, this.javaSettingsTab,
+            this.networkSettingsTab, this.loggingSettingsTab, this.toolsSettingsTab, this.backupsSettingsTab });
     private JTabbedPane tabbedPane;
     private JPanel bottomPanel;
-    private JButton saveButton = new JButton(Language.INSTANCE.localize("common.save"));
+    private JButton saveButton = new JButton(GetText.tr("Save"));
 
     public SettingsTab() {
         RelocalizationManager.addListener(this);
@@ -57,6 +60,10 @@ public class SettingsTab extends JPanel implements Tab, RelocalizationListener {
 
         tabbedPane = new JTabbedPane(JTabbedPane.TOP);
         tabbedPane.setBackground(App.THEME.getBaseColor());
+        tabbedPane.addChangeListener(e -> {
+            String title = ((Tab) tabbedPane.getSelectedComponent()).getTitle();
+            Analytics.sendScreenView(title + " Settings");
+        });
 
         tabbedPane.setFont(App.THEME.getDefaultFont().deriveFont(17.0F));
         for (Tab tab : this.tabs) {
@@ -71,43 +78,38 @@ public class SettingsTab extends JPanel implements Tab, RelocalizationListener {
         bottomPanel.add(saveButton);
 
         add(bottomPanel, BorderLayout.SOUTH);
-        saveButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent arg0) {
-                if (javaSettingsTab.isValidJavaPath() && javaSettingsTab.isValidJavaParamaters() &&
-                        networkSettingsTab.isValidConcurrentConnections() && networkSettingsTab.isValidProxyPort() &&
-                        networkSettingsTab.canConnectWithProxy() && toolsSettingsTab.isValidServerCheckerWait()) {
-                    boolean reloadTheme = generalSettingsTab.needToReloadTheme();
-                    boolean reloadLocalizationTable = generalSettingsTab.reloadLocalizationTable();
-                    boolean reloadPacksPanel = generalSettingsTab.needToReloadPacksPanel();
-                    boolean restartServerChecker = toolsSettingsTab.needToRestartServerChecker();
-                    generalSettingsTab.save();
-                    javaSettingsTab.save();
-                    networkSettingsTab.save();
-                    loggingSettingsTab.save();
-                    toolsSettingsTab.save();
-                    App.settings.saveProperties();
-                    SettingsManager.post();
-                    if (reloadLocalizationTable) {
-                        RelocalizationManager.post();
-                    }
-                    if (reloadPacksPanel) {
-                        App.settings.reloadPacksPanel();
-                    }
-                    if (restartServerChecker) {
-                        App.settings.startCheckingServers();
-                    }
-                    if (reloadTheme) {
-                        App.settings.restartLauncher();
-                    }
-                    App.TOASTER.pop("Settings Saved");
+        saveButton.addActionListener(arg0 -> {
+            if (javaSettingsTab.isValidJavaPath() && javaSettingsTab.isValidJavaParamaters()
+                    && networkSettingsTab.isValidConcurrentConnections() && networkSettingsTab.isValidProxyPort()
+                    && networkSettingsTab.canConnectWithProxy() && toolsSettingsTab.isValidServerCheckerWait()) {
+                boolean reloadTheme = generalSettingsTab.needToReloadTheme();
+                boolean reloadPacksPanel = generalSettingsTab.needToReloadPacksPanel();
+                boolean restartServerChecker = toolsSettingsTab.needToRestartServerChecker();
+                generalSettingsTab.save();
+                javaSettingsTab.save();
+                networkSettingsTab.save();
+                loggingSettingsTab.save();
+                toolsSettingsTab.save();
+                backupsSettingsTab.save();
+                App.settings.saveProperties();
+                SettingsManager.post();
+                if (reloadPacksPanel) {
+                    App.settings.reloadPacksPanel();
                 }
+                if (restartServerChecker) {
+                    App.settings.startCheckingServers();
+                }
+                if (reloadTheme) {
+                    OS.restartLauncher();
+                }
+                App.TOASTER.pop("Settings Saved");
             }
         });
     }
 
     @Override
     public String getTitle() {
-        return Language.INSTANCE.localize("tabs.settings");
+        return GetText.tr("Settings");
     }
 
     @Override
@@ -115,7 +117,7 @@ public class SettingsTab extends JPanel implements Tab, RelocalizationListener {
         for (int i = 0; i < this.tabbedPane.getTabCount(); i++) {
             this.tabbedPane.setTitleAt(i, this.tabs.get(i).getTitle());
         }
-        this.saveButton.setText(Language.INSTANCE.localize("common.save"));
+        this.saveButton.setText(GetText.tr("Save"));
     }
 
 }

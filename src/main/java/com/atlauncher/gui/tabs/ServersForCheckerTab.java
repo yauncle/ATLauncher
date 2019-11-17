@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,10 +17,13 @@
  */
 package com.atlauncher.gui.tabs;
 
-import com.atlauncher.App;
-import com.atlauncher.data.Language;
-import com.atlauncher.data.MinecraftServer;
-import com.atlauncher.gui.dialogs.AddEditServerForCheckerDialog;
+import java.awt.BorderLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 
 import javax.swing.DefaultListModel;
 import javax.swing.DefaultListSelectionModel;
@@ -30,24 +33,20 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionListener;
-import java.awt.BorderLayout;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.KeyAdapter;
-import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+
+import com.atlauncher.App;
+import com.atlauncher.data.MinecraftServer;
+import com.atlauncher.gui.dialogs.AddEditServerForCheckerDialog;
+
+import org.mini2Dx.gettext.GetText;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ServersForCheckerTab extends JPanel implements ActionListener {
-    /**
-     * Auto generated serial.
-     */
     private static final long serialVersionUID = 3385411077046354453L;
 
     private final JPopupMenu CONTEXT_MENU = new JPopupMenu();
-    private final JMenuItem EDIT_BUTTON = new JMenuItem(Language.INSTANCE.localize("common.edit"));
-    private final JMenuItem DELETE_BUTTON = new JMenuItem(Language.INSTANCE.localize("common.delete"));
+    private final JMenuItem EDIT_BUTTON = new JMenuItem(GetText.tr("Edit"));
+    private final JMenuItem DELETE_BUTTON = new JMenuItem(GetText.tr("Delete"));
 
     private DefaultListModel<MinecraftServer> listModel;
     private JList serverList;
@@ -59,7 +58,7 @@ public class ServersForCheckerTab extends JPanel implements ActionListener {
         CONTEXT_MENU.add(EDIT_BUTTON);
         CONTEXT_MENU.add(DELETE_BUTTON);
 
-        listModel = new DefaultListModel<MinecraftServer>();
+        listModel = new DefaultListModel<>();
         for (MinecraftServer server : App.settings.getCheckingServers()) {
             listModel.addElement(server);
         }

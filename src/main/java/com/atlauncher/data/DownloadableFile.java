@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,35 +17,27 @@
  */
 package com.atlauncher.data;
 
-import com.atlauncher.App;
-
-import java.io.File;
+import com.atlauncher.FileSystem;
+import com.atlauncher.network.Download;
 
 public class DownloadableFile {
-    private String name;
-    private String folder;
-    private int size;
-    private String md5;
-    private String sha1;
+    public String name;
+    public String folder;
+    public int size;
+    public String sha1;
 
     public boolean isLauncher() {
-        return this.name.equals("Launcher");
+        return this.name.equals("launcher");
     }
 
-    public String getMD5() {
-        return this.md5;
+    public boolean isFiles() {
+        return this.name.equals("files.json");
     }
 
-    public String getSHA1() {
-        return this.sha1;
-    }
-
-    public Downloadable getDownloadable() {
-        File file = new File(new File(App.settings.getConfigsDir(), this.folder), this.name);
-        if (this.folder.equalsIgnoreCase("Skins")) {
-            file = new File(App.settings.getSkinsDir(), this.name);
-        }
-        return new Downloadable("launcher/" + this.folder.toLowerCase() + "/" + this.name, file, this.sha1, this
-                .size, null, true);
+    public Download getDownload() {
+        return Download.build()
+                .setUrl(String.format("%s/launcher/%s/%s", Constants.DOWNLOAD_SERVER, this.folder.toLowerCase(),
+                        this.name))
+                .downloadTo(FileSystem.CONFIGS.resolve(this.folder + "/" + this.name)).size(this.size).hash(this.sha1);
     }
 }

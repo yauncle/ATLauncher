@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,22 +17,24 @@
  */
 package com.atlauncher.gui;
 
-import com.atlauncher.data.Language;
-import com.atlauncher.utils.Utils;
-
-import javax.swing.JMenuItem;
-import javax.swing.JPopupMenu;
-import javax.swing.JWindow;
 import java.awt.Graphics;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 
+import javax.swing.JMenuItem;
+import javax.swing.JPopupMenu;
+import javax.swing.JWindow;
+
+import com.atlauncher.utils.Utils;
+
+import org.mini2Dx.gettext.GetText;
+
 /**
- * The splash screen which shows when the launcher is started up and is loading it's stuff.
+ * The splash screen which shows when the launcher is started up and is loading
+ * it's stuff.
  */
+@SuppressWarnings("serial")
 public class SplashScreen extends JWindow {
     private static final BufferedImage img = Utils.getImage("SplashScreen");
     private final ContextMenu CONTEXT_MENU = new ContextMenu();
@@ -66,20 +68,16 @@ public class SplashScreen extends JWindow {
     }
 
     /**
-     * The context menu which is shows on right click for the splash screen image, giving a force quit option.
+     * The context menu which is shows on right click for the splash screen image,
+     * giving a force quit option.
      */
     private final class ContextMenu extends JPopupMenu {
-        private final JMenuItem FORCE_QUIT = new JMenuItem(Language.INSTANCE.localize("common.forcequit"));
+        private final JMenuItem FORCE_QUIT = new JMenuItem(GetText.tr("Force quit"));
 
         public ContextMenu() {
             super();
 
-            this.FORCE_QUIT.addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent e) {
-                    System.exit(0);
-                }
-            });
+            this.FORCE_QUIT.addActionListener(e -> System.exit(0));
             this.add(this.FORCE_QUIT);
         }
     }

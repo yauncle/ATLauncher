@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,68 +17,26 @@
  */
 package com.atlauncher.data;
 
-import com.atlauncher.App;
-import com.atlauncher.LogManager;
-import com.atlauncher.exceptions.InvalidMinecraftVersion;
-
 public class PackVersion {
-    private String version;
-    private String minecraft;
-    private String hash;
-    private MinecraftVersion minecraftVersion;
-    private boolean canUpdate = true;
-    private boolean isRecommended = true;
-    private boolean isDev;
-
-    public String getVersion() {
-        return this.version;
-    }
+    public String version;
+    public String hash;
+    public MinecraftVersion minecraftVersion;
+    public boolean canUpdate = true;
+    public boolean isRecommended = true;
+    public boolean isDev = false;
+    public boolean hasLoader = false;
+    public boolean hasChoosableLoader = false;
 
     public String getSafeVersion() {
         return this.version.replaceAll("[^A-Za-z0-9]", "");
     }
 
-    public void setMinecraftVesion() {
-        try {
-            this.minecraftVersion = App.settings.getMinecraftVersion(this.minecraft);
-        } catch (InvalidMinecraftVersion e) {
-            this.minecraftVersion = null;
-            LogManager.logStackTrace(e);
-        }
-    }
-
-    public MinecraftVersion getMinecraftVersion() {
-        if (this.minecraftVersion == null) {
-            this.setMinecraftVesion();
-        }
-        return this.minecraftVersion;
-    }
-
-    public String getHash() {
-        if (this.hash == null || !this.isDev) {
-            return null;
-        }
-        return this.hash;
-    }
-
-    public boolean canUpdate() {
-        return this.canUpdate;
-    }
-
-    public boolean isRecommended() {
-        return this.isRecommended;
-    }
-
-    public boolean isDev() {
-        return this.isDev;
-    }
-
     public String toString() {
-        if (this.minecraft.equalsIgnoreCase(this.version)) {
+        if (this.minecraftVersion.version.equalsIgnoreCase(this.version)) {
             return this.version;
         }
 
-        return this.version + " (" + this.getMinecraftVersion().getVersion() + ")";
+        return this.version + " (" + this.minecraftVersion.version + ")";
     }
 
     public boolean versionMatches(String version) {
@@ -91,6 +49,14 @@ public class PackVersion {
         }
 
         return this.hash.equalsIgnoreCase(hash);
+    }
+
+    public boolean hasLoader() {
+        return this.hasLoader;
+    }
+
+    public boolean hasChoosableLoader() {
+        return this.hasChoosableLoader;
     }
 
 }

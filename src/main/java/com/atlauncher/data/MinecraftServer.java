@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,13 +17,16 @@
  */
 package com.atlauncher.data;
 
+import java.text.DecimalFormat;
+import java.util.List;
+
 import com.atlauncher.App;
 import com.atlauncher.utils.MCQuery;
 import com.google.gson.reflect.TypeToken;
-import de.zh32.pingtest.QueryVersion;
 
-import java.text.DecimalFormat;
-import java.util.List;
+import org.mini2Dx.gettext.GetText;
+
+import de.zh32.pingtest.QueryVersion;
 
 public class MinecraftServer {
     /**
@@ -48,7 +51,8 @@ public class MinecraftServer {
     private int port;
 
     /**
-     * The QueryVersion to use when querying the server so we don't have to loop through and try them all everytime.
+     * The QueryVersion to use when querying the server so we don't have to loop
+     * through and try them all everytime.
      */
     private QueryVersion queryVersion;
 
@@ -78,13 +82,13 @@ public class MinecraftServer {
     }
 
     /**
-     * Checks this server to see if it's online or not and if a notification should be displayed to the user.
+     * Checks this server to see if it's online or not and if a notification should
+     * be displayed to the user.
      */
     public void checkServer() {
         int playersOnline = MCQuery.getNumberOfPlayers(this.host, this.port, this.queryVersion);
 
         if (!this.hasRun) {
-            System.out.println("Server Checking Started");
             App.TOASTER.pop(String.format("Server Checking on %s has started!", this.name));
             this.hasRun = true;
         } else {
@@ -93,8 +97,8 @@ public class MinecraftServer {
                 App.TOASTER.popError(String.format("Server %s is now offline!", this.name));
             } else if (playersOnline >= 0 && this.playersOnline == -1) {
                 // The server WAS offline and now it isn't
-                App.TOASTER.pop(String.format("Server %s is now online with %d players", this.name, this
-                        .playersOnline));
+                App.TOASTER
+                        .pop(String.format("Server %s is now online with %d players", this.name, this.playersOnline));
             }
         }
 
@@ -145,10 +149,10 @@ public class MinecraftServer {
 
     private String getStatusLocalization() {
         if (this.playersOnline == -1) {
-            return Language.INSTANCE.localize("tools.serverchecker.offline");
+            return GetText.tr("Offline");
         } else {
-            return Language.INSTANCE.localize("tools.serverchecker.online") + " - " + this.getPrintablePlayersOnline
-                    () + " Players";
+            return GetText.tr("Online") + " - " + this.getPrintablePlayersOnline()
+                    + " Players";
         }
     }
 

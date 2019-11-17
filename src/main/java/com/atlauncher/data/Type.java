@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,10 +18,6 @@
 package com.atlauncher.data;
 
 public enum Type {
-    jar, dependency,
-    forge, mcpc, mods, plugins,
-    ic2lib, denlib, flan, coremods,
-    extract, decomp, millenaire, texturepack,
-    resourcepack, texturepackextract, resourcepackextract,
-    shaderpack
+    jar, dependency, forge, mcpc, worlds, mods, plugins, ic2lib, denlib, flan, coremods, extract, decomp, millenaire,
+    texturepack, resourcepack, texturepackextract, resourcepackextract, shaderpack
 }

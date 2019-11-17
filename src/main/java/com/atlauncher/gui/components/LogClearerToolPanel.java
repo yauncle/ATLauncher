@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,27 +17,29 @@
  */
 package com.atlauncher.gui.components;
 
-import com.atlauncher.App;
-import com.atlauncher.data.Language;
-import com.atlauncher.utils.HTMLUtils;
-import com.atlauncher.utils.Utils;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.File;
 
 import javax.swing.BorderFactory;
 import javax.swing.JLabel;
 import javax.swing.border.BevelBorder;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 
+import com.atlauncher.FileSystem;
+import com.atlauncher.builders.HTMLBuilder;
+import com.atlauncher.managers.DialogManager;
+import com.atlauncher.network.Analytics;
+import com.atlauncher.utils.Utils;
+
+import org.mini2Dx.gettext.GetText;
+
+@SuppressWarnings("serial")
 public class LogClearerToolPanel extends AbstractToolPanel implements ActionListener {
-    /**
-     * Auto generated serial.
-     */
-    private static final long serialVersionUID = 1964636496849129267L;
+    private final JLabel TITLE_LABEL = new JLabel(GetText.tr("Log Clearer"));
 
-    private final JLabel TITLE_LABEL = new JLabel(Language.INSTANCE.localize("tools.logclearer"));
-
-    private final JLabel INFO_LABEL = new JLabel(HTMLUtils.centerParagraph(Utils.splitMultilinedString(Language
-            .INSTANCE.localize("tools.logclearer.info"), 60, "<br>")));
+    private final JLabel INFO_LABEL = new JLabel(new HTMLBuilder().center().split(60).text(GetText.tr(
+            "This tool clears out all logs created by the launcher (not included those made by instances) to free up space and old junk."))
+            .build());
 
     public LogClearerToolPanel() {
         TITLE_LABEL.setFont(BOLD_FONT);
@@ -51,7 +53,14 @@ public class LogClearerToolPanel extends AbstractToolPanel implements ActionList
     @Override
     public void actionPerformed(ActionEvent e) {
         if (e.getSource() == LAUNCH_BUTTON) {
-            App.settings.clearAllLogs();
+            Analytics.sendEvent("LogClearer", "Run", "Tool");
+
+            for (File file : FileSystem.LOGS.resolve("old").toFile().listFiles()) {
+                Utils.delete(file);
+            }
+
+            DialogManager.okDialog().setType(DialogManager.INFO).setTitle(GetText.tr("Success"))
+                    .setContent(GetText.tr("Successfully cleared the logs.")).show();
         }
     }
 }

@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,29 +17,32 @@
  */
 package com.atlauncher.gui.card;
 
-import com.atlauncher.App;
-import com.atlauncher.data.Language;
-import com.atlauncher.evnt.listener.RelocalizationListener;
-import com.atlauncher.evnt.manager.RelocalizationManager;
-import com.atlauncher.gui.components.ImagePanel;
-import com.atlauncher.utils.Utils;
+import java.awt.BorderLayout;
+import java.awt.Font;
+import java.awt.Image;
 
 import javax.swing.BorderFactory;
 import javax.swing.JPanel;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.border.TitledBorder;
-import java.awt.BorderLayout;
-import java.awt.Font;
-import java.awt.Image;
-import java.io.File;
+
+import com.atlauncher.FileSystem;
+import com.atlauncher.evnt.listener.RelocalizationListener;
+import com.atlauncher.evnt.manager.RelocalizationManager;
+import com.atlauncher.gui.components.ImagePanel;
+import com.atlauncher.utils.OS;
+import com.atlauncher.utils.Utils;
+
+import org.mini2Dx.gettext.GetText;
 
 /**
  * Class for displaying packs in the Pack Tab.
  */
+@SuppressWarnings("serial")
 public class NilCard extends JPanel implements RelocalizationListener {
-    private static final Image defaultImage = Utils.getIconImage(new File(App.settings.getImagesDir(), "defaultimage" +
-            ".png")).getImage();
+    private static final Image defaultImage = Utils.getIconImage(FileSystem.IMAGES.resolve("defaultimage.png").toFile())
+            .getImage();
 
     private final JTextArea error = new JTextArea();
     private final JSplitPane splitter = new JSplitPane();
@@ -48,12 +51,12 @@ public class NilCard extends JPanel implements RelocalizationListener {
         super(new BorderLayout());
         RelocalizationManager.addListener(this);
 
-        if (Utils.isMac()) {
-            this.setBorder(new TitledBorder(null, Language.INSTANCE.localize("common.nothingtoshow"), TitledBorder
-                    .DEFAULT_JUSTIFICATION, TitledBorder.DEFAULT_POSITION, new Font("SansSerif", Font.BOLD, 14)));
+        if (OS.isMac()) {
+            this.setBorder(new TitledBorder(null, GetText.tr("Nothing To Show"), TitledBorder.DEFAULT_JUSTIFICATION,
+                    TitledBorder.DEFAULT_POSITION, new Font("SansSerif", Font.BOLD, 14)));
         } else {
-            this.setBorder(new TitledBorder(null, Language.INSTANCE.localize("common.nothingtoshow"), TitledBorder
-                    .DEFAULT_JUSTIFICATION, TitledBorder.DEFAULT_POSITION, new Font("SansSerif", Font.BOLD, 15)));
+            this.setBorder(new TitledBorder(null, GetText.tr("Nothing To Show"), TitledBorder.DEFAULT_JUSTIFICATION,
+                    TitledBorder.DEFAULT_POSITION, new Font("SansSerif", Font.BOLD, 15)));
         }
 
         this.error.setBorder(BorderFactory.createEmptyBorder());
@@ -77,6 +80,6 @@ public class NilCard extends JPanel implements RelocalizationListener {
     @Override
     public void onRelocalization() {
         TitledBorder border = (TitledBorder) this.getBorder();
-        border.setTitle(Language.INSTANCE.localize("common.nothingtoshow"));
+        border.setTitle(GetText.tr("Nothing To Show"));
     }
 }

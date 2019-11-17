@@ -1,6 +1,6 @@
 /*
  * ATLauncher - https://github.com/ATLauncher/ATLauncher
- * Copyright (C) 2013 ATLauncher
+ * Copyright (C) 2013-2019 ATLauncher
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,12 +17,11 @@
  */
 package com.atlauncher.data;
 
+import java.util.List;
+
 import com.atlauncher.App;
-import com.atlauncher.LogManager;
 import com.atlauncher.annot.Json;
 import com.atlauncher.exceptions.InvalidPack;
-
-import java.util.List;
 
 @Json
 public class PackUsers {
@@ -35,7 +34,6 @@ public class PackUsers {
         try {
             pack = App.settings.getPackByID(this.pack);
         } catch (InvalidPack e) {
-            LogManager.logStackTrace(e);
             return;
         }
         if (this.testers != null) {
